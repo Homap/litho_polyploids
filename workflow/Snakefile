@@ -1,0 +1,419 @@
+__author__ = "Homa Papoli Yazdi"
+__email__ = "homa.papoli_yazdi@biol.lu.se"
+
+configfile: "config/config.yaml"
+localrules: all, multiqc, multiqc_after_filtering, create_intervals
+
+#----------------------------------------------------------------------------#
+#--------------------Import Python modules-----------------------------------#
+#----------------------------------------------------------------------------#
+import pandas as pd
+import os
+
+#----------------------------------------------------------------------------#
+#--------------------Reading design table------------------------------------#
+#----------------------------------------------------------------------------#
+design_table = pd.read_table(config["sample_table"], sep="\t")
+sample_name = design_table.Sample_Name
+fastq_name = design_table.Fastq_Name
+#--------------------Function to get Read Group for each sample--------------#
+def get_readgroup(sample_name):
+    read_group = pd.read_table("config/ReadGroup.txt", sep="\t")
+    read_group_dict = dict(read_group.values)
+    return read_group_dict[sample_name]
+#----------------------------------------------------------------------------#
+
+rule all:
+    input: 
+        html_output = expand(["results/fastqc/{sample}_{pair}_001_fastqc.html",
+        "results/multiqc/multiqc_report.html",  "results/fastp_report/{sample}.html",
+        "results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.html",
+        "results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip",
+        "results/multiqc_filtered/multiqc_report.html"], \
+        sample=fastq_name, pair=config["pair"], genome=config["genome"], num=[i for i in range(1, 2)])#17)])
+
+        # "data/genome/{genome}.fasta.amb",
+        # "data/genome/{genome}.fasta.ann",
+        # "data/genome/{genome}.fasta.bwt",
+        # "data/genome/{genome}.fasta.pac",
+        # "data/genome/{genome}.fasta.sa",
+        # "results/mapped/{sample}.sorted.bam",
+        # "results/mapped/{sample}.sorted.bai",
+        # "results/mapped/{sample}.flagstats.txt",
+        # "results/mapped_dedup/{sample}.dedup.bam",
+        # "results/mapped_dedup/{sample}.metrics.txt",
+        # "config/intervals/interval_{num}.bed",
+        # "data/genome/{genome}.dict",
+        # "data/genome/ASM69896v1_HiC.fasta.fai",
+        # "results/gvcf/{sample}/{sample}.{num}.gvcf"
+
+rule fastqc:
+    input:
+       fastq="data/fastq/{sample}_{pair}_001.fastq.gz",
+    output:
+        fastqc_html="results/fastqc/{sample}_{pair}_001_fastqc.html",
+        fastqc_zip="results/fastqc/{sample}_{pair}_001_fastqc.zip"
+    params:
+        outdir="results/fastqc",
+        sample_adapter="data/adapters/adapters.txt"
+    resources:
+        threads = 4,
+        mem_mb = 24000,
+        runtime = "3h"
+#    conda:
+#        "envs/fastqc.yaml"
+    singularity:
+        "containers/fastqc_0.12.1.sif"
+    shell:
+        """
+        fastqc {input} \
+        threads {resources.threads} \
+        --outdir {params.outdir} \
+        --kmers 7 \
+        --adapters {params.sample_adapter}
+        """
+
+rule multiqc:
+    input:
+        expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
+    output:
+        "results/multiqc/multiqc_report.html"
+#    conda:
+#        "envs/multiqc.yaml"
+    singularity:
+        "containers/multiqc_v1.25.sif"
+    shell:
+        "multiqc results/fastqc/*fastqc.zip -o results/multiqc"
+
+rule filtering_fastp:
+    input:
+        fastq1="data/fastq/{sample}_R1_001.fastq.gz",
+        fastq2="data/fastq/{sample}_R2_001.fastq.gz"
+    output:
+        fastq1_filtered="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
+        fastq2_filtered="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
+        unpaired1="data/fastq_unpaired/{sample}_unpaired1.fastq.gz",
+        unpaired2="data/fastq_unpaired/{sample}_unpaired2.fastq.gz",
+        failed_out="data/fastq_failed/{sample}.failed.fastq.gz",
+        html_report="results/fastp_report/{sample}.html"
+    params:
+        adapter_fasta="data/adapters/seqs_to_remove.fasta"
+    resources:
+        threads=10,
+        runtime="12h"
+#    conda:
+#        "envs/fastp.yaml"
+    singularity:
+        "containers/fastp_0.23.4.sif"
+    shell:
+        """
+        fastp \
+        --in1 {input.fastq1} \
+        --in2 {input.fastq2} \
+        --out1 {output.fastq1_filtered} \
+        --out2 {output.fastq2_filtered} \
+        --unpaired1 {output.unpaired1} \
+        --unpaired2 {output.unpaired2} \
+        --failed_out {output.failed_out} \
+        --html {output.html_report} \
+        --trim_poly_g 12 \
+        --qualified_quality_phred=20 \
+        --unqualified_percent_limit=40 \
+        --length_required=140 \
+        --overrepresentation_analysis \
+        --adapter_fasta {params.adapter_fasta} \
+        --thread {resources.threads}
+        """
+
+rule fastqc_after_filtering:
+    input:
+       fastq="data/fastq_filtered/{sample}_{pair}_001.filtered.fastq.gz"
+    output:
+        fastqc_html="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.html",
+        fastqc_zip="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip"
+    params:
+        outdir="results/fastqc_filtered",
+        sample_adapter="data/adapters/adapters.txt"
+    resources:
+        threads = 4,
+        mem_mb = 24000,
+        runtime = "3h"
+#    conda:
+#        "envs/fastqc.yaml"
+    singularity:
+        "containers/fastqc_0.12.1.sif"
+    shell:
+        """
+        fastqc {input} \
+        threads {resources.threads} \
+        --outdir {params.outdir} \
+        --kmers 7 \
+        --adapters {params.sample_adapter}
+        """
+
+rule multiqc_after_filtering:
+    input:
+        expand("results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip", sample=fastq_name, pair=config["pair"])
+    output:
+        "results/multiqc_filtered/multiqc_report.html"
+#    conda:
+#        "envs/multiqc.yaml"
+    singularity:
+        "containers/multiqc_v1.25.sif"
+    shell:
+        "multiqc results/fastqc_filtered/*filtered_fastqc.zip -o results/multiqc_filtered"
+
+# rule bwa_index:
+#     input:
+#         "data/genome/{genome}.fasta",
+#     output:
+#         idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
+#     log:
+#         "logs/bwa_index/{genome}.log"
+#     resources:
+#         threads= 10,
+#         runtime= "2h"
+#     conda:
+#         "envs/bwa_samtools.yaml"
+#     shell:
+#         """
+#         bwa index {input}
+#         """
+
+# rule bwa_mem:
+#     input:
+#         fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
+#         fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
+#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+#     output:
+#         bam="results/mapped/{sample}.sorted.bam",
+#         bai="results/mapped/{sample}.sorted.bai",
+#         flagstats="results/mapped/{sample}.flagstats.txt"
+#     params:
+#         readgroup=lambda wildcards: get_readgroup(wildcards.sample)
+#     resources:
+#         threads= 18,
+#         runtime= "18h",
+#         mem_mb= 115200,
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/bwa_samtools.yaml"
+#     shell:
+#         """
+#         bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} | tee >(samtools flagstat - > {output.flagstats}) | \
+#         samtools sort -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
+#         """
+
+# rule markduplicates_bam:
+#     input:
+#         bam="results/mapped/{sample}.sorted.bam"
+#     output:
+#         dedupBam="results/mapped_dedup/{sample}.dedup.bam",
+#         metrics="results/mapped_dedup/{sample}.metrics.txt"
+#     resources:
+#         threads=20,
+#         mem_mb=120000,
+#         runtime="12h",
+#         tmpdir="$SNIC_TMP"
+#     params:
+#         mem= "-Xmx120g"
+#     benchmark:
+#         "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
+#     conda:
+#         "envs/picard.yaml"
+#     shell:
+#         """
+#         picard MarkDuplicates {params.mem} --INPUT {input} --OUTPUT {output.dedupBam} --METRICS_FILE {output.metrics} --TMP_DIR {resources.tmpdir} \
+#         --VALIDATION_STRINGENCY LENIENT \
+#         --ASSUME_SORT_ORDER coordinate \
+#         --CREATE_INDEX TRUE
+#         """
+# # Create a list of intervals for scaffolds larger than 1000 bp to use with Haplotype Caller:
+# rule create_intervals:
+#     input:
+#         genome="data/genome/ASM69896v1_HiC.fasta"
+#     output:
+#         intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 17)])
+#     params:
+#         min_scaf_len = 1000,
+#         num_scafs_per_interval = 4
+#     shell:
+#         """
+#         python workflow/scripts/split_fasta.py data/genome/ASM69896v1_HiC.fasta {params.min_scaf_len} {params.num_scafs_per_interval} "config/intervals"
+#         """
+
+# rule createSeqdict:
+#     input:
+#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+#     output:
+#         genome_fasta_dict="data/genome/ASM69896v1_HiC.dict"
+#     resources:
+#         threads=4,
+#         mem_mb=24000,
+#         runtime="5h",
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/picard.yaml"
+#     shell:
+#         """
+#         picard CreateSequenceDictionary \
+#         --REFERENCE {input} \
+#         --OUTPUT {output}
+#         """
+
+# rule createSeqfai:
+#     input:
+#         genome_fasta="data/genome/ASM69896v1_HiC.fasta"
+#     output:
+#         genome_index="data/genome/ASM69896v1_HiC.fasta.fai"
+#     resources:
+#         threads= 4,
+#         runtime= "2h",
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/bwa_samtools.yaml"
+#     shell:
+#         """
+#         samtools faidx {input}
+#         """
+
+
+# rule HaplotypeCaller_gvcf:
+#     input:
+#         genome_fasta="data/genome/ASM69896v1_HiC.fasta",
+#         genome_fasta_dict="data/genome/ASM69896v1_HiC.dict",
+#         genome_index="data/genome/ASM69896v1_HiC.fasta.fai",
+#         bam="results/mapped_dedup/{sample}.dedup.bam"
+#     output:
+#         gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
+#     resources:
+#         threads=10,
+#         mem_mb=64000,
+#         runtime="48h",
+#         tmpdir="$SNIC_TMP"
+#     params:
+#         mem= "-Xmx64g",
+#         interval="config/intervals/interval_{num}.bed"
+#     benchmark:
+#         "benchmark/gatk_haplotypecaller/{sample}.{num}.gatkHaplotypeCaller.txt"
+#     singularity:
+#         "containers/gatk_4.6.0.0.sif"
+#     shell:
+#         """
+#         gatk --java-options {params.mem} HaplotypeCaller \
+#         -R {input.genome_fasta} \
+#         -L {params.interval} \
+#         -I {input.bam} \
+#         -O {output} \
+#         --tmp-dir {resources.tmpdir} \
+#         -ERC GVCF
+#         """
+
+# # for interval in {1..70}
+# # do
+# # cat readgroup6x.txt | while read line
+# # do 
+# # sample=$(echo $line | cut -f1 -d " ")
+# # echo -e ${sample}'\t'/proj/snic2020-6-293/private/result/haplotype_caller_polyploids/${sample}/${sample}.interval_${interval}.gvcf \
+# # >> /proj/snic2020-6-293/private/result/genomicsdbimport_polyploids/hexa_db_samplemap/interval_${interval}.sample_map 
+# # done
+# # done
+
+# # for interval in ${db}/*.sample_map
+# # do
+# # echo $interval
+# # interval_n=$(echo $interval | cut -f8 -d "/" | cut -f1 -d ".")
+# # echo $interval_n
+# # echo ${interval_n}.sample_map 
+# # sbatch genomicsdbimport.sh ${db}/${interval_n} ${bed}/${interval_n}.bed ${db}/${interval_n}.sample_map 
+# # done
+
+# rule create_gdb_mapfile:
+#     input:
+#         gvcf="results/gvcf/${sample}/${sample}.interval_${interval}.gvcf"
+#     output:
+#         sample_map="config/sample_map/interval_{num}.sample_map"
+#     shell:
+#     """
+#         for interval in {1..70}
+#         do
+#         cat sample_design_table.tsv | while read line
+#         do 
+#         sample=$(echo $line | cut -f1 -d " ")
+#         echo -e ${sample}'\t'results/gvcf/${sample}/${sample}.interval_${interval}.gvcf \
+#         >> config/sample_map/interval_${interval}.sample_map 
+#         done
+#         done
+#     """
+
+
+# # Let's do two types of genotyping.One with all samples together, and one per each family.
+# rule genomicsdbimport:
+#     input:
+#         sample_map="config/sample_map/interval_{num}.sample_map"
+#     output:
+#         db=directory("results/genomicsdb/interval_{num}_gdb")
+#     resources:
+#         threads=10,
+#         mem_mb=64000,
+#         runtime="48h",
+#         tmpdir="$SNIC_TMP"
+#     params:
+#         mem= "-Xmx64g",
+#         interval="config/intervals/interval_{num}.bed"
+#     benchmark:
+#         "benchmark/gatk_haplotypecaller/{sample}.{num}.genomicsdbimport.txt"
+#     singularity:
+#         "containers/gatk_4.6.0.0.sif"
+#     shell:
+#         """
+#         gatk --java-options {params.mem} GenomicsDBImport \
+#         --genomicsdb-workspace-path {output} \
+#         --intervals {params.interval} \
+#         --batch-size 50 \
+#         --sample-name-map {input.sample_map} \
+#         --tmp-dir {resources.tmpdir} \
+#         --reader-threads {resources.threads}
+#         """
+
+# rule GenotypeGVCFs:
+#     input:
+#         db="results/genomicsdb/interval_{num}_gdb"
+#         genome_fasta="data/genome/{genome}.fasta"
+#     output:
+#         vcf="results/vcf/ostrich_families_{num}.vcf"
+#     resources:
+#         threads=10,
+#         mem_mb=64000,
+#         runtime="48h",
+#         tmpdir="$SNIC_TMP"
+#     params:
+#         mem= "-Xmx64g",
+#         interval="config/intervals/interval_{num}.bed"
+#     benchmark:
+#         "benchmark/gatk_haplotypecaller/{sample}.{num}.genotypeGVCF.txt"
+#     singularity:
+#         "containers/gatk_4.6.0.0.sif"
+#     shell:
+#         """
+#         gatk --java-options {params.mem} GenotypeGVCFs \
+#         -R {input.genome_fasta} \
+#         -V gendb://{input.db} \
+#         -O {output}
+#         --tmp-dir {resources.tmpdir}
+#         """
+
+# # for interval in ${db}/*.sample_map
+# # do
+# # echo $interval
+# # interval_n=$(echo $interval | cut -f8 -d "/" | cut -f1 -d ".")
+# # echo $interval_n
+# # echo "gendb://${db}/${interval_n}"
+# # sbatch genotypeGVCF.sh ${genomedir} "gendb://${db}/${interval_n}" ${vcf}/${interval_n}.vcf
+# # done
+# The help session was very helpful! What I took out of the session:
+# 1. Go back to filtering and make sure filtering is done correctly. You can try adding --adapter_fasta in fastp and adding polyG and any other over-represented sequence as adaptors.
+# 2. Check the quality of the sequences and see how they have changed.
+# 3. Use samtools idxstats to get the statistics for the Bam files
+# 4. Remove scaffolds with no reads mapping to them from the GATK analyses
+# 5. Reduce the number of cores for the GATK HaplotypeCaller and increase the number of intervals so the work is done faster
