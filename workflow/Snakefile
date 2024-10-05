@@ -2,7 +2,7 @@ __author__ = "Homa Papoli Yazdi"
 __email__ = "homa.papoli_yazdi@biol.lu.se"
 
 configfile: "config/config.yaml"
-localrules: all, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals
+localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals
 genome_name=config["genome"]
 
 #----------------------------------------------------------------------------#
@@ -16,11 +16,18 @@ import os
 design_table = pd.read_table(config["sample_table"], sep="\t")
 sample_name = design_table.Sample_Name
 fastq_name = design_table.Fastq_Name
+ploidy_level = design_table.Ploidy
 #--------------------Function to get Read Group for each sample--------------#
 def get_readgroup(sample_name):
     read_group = pd.read_table("config/ReadGroup.txt", sep="\t")
     read_group_dict = dict(read_group.values)
     return read_group_dict[sample_name]
+#----------------------------------------------------------------------------#
+#------------------Function to get Ploidy level for each sample--------------#
+def get_ploidy(sample_name):
+    design_table = pd.read_table(config["sample_table"], sep="\t")
+    ploidy_dict = dict(zip(design_table.Fastq_Name, design_table.Ploidy))
+    return ploidy_dict[sample_name]
 #----------------------------------------------------------------------------#
 
 rule all:
@@ -93,8 +100,6 @@ rule multiqc:
         expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
     output:
         "results/multiqc/multiqc_report.html"
-#    conda:
-#        "envs/multiqc.yaml"
     singularity:
         "containers/multiqc_v1.25.sif"
     shell:
@@ -179,7 +184,7 @@ rule bwa_index:
     output:
         idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
     resources:
-        threads= 10,
+        threads= 3,
         runtime= "2h"
     singularity:
         "containers/bwa_0.7.18.sif"
@@ -196,12 +201,11 @@ rule createSeqdict:
     resources:
         threads=4,
         runtime="5h",
-        tmpdir="$SNIC_TMP"
     singularity:
         "containers/picard_3.2.0.sif"
     shell:
         """
-        picard CreateSequenceDictionary \
+        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
         --REFERENCE {input} \
         --OUTPUT {output}
         """
@@ -214,7 +218,6 @@ rule createSeqfai:
     resources:
         threads= 4,
         runtime= "2h",
-        tmpdir="$SNIC_TMP"
     singularity:
         "containers/samtools_1.20.c.sif"
     shell:
@@ -228,7 +231,12 @@ rule bwa_mem:
     input:
         fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
         fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
-        genome_fasta="data/genome/{genome}.fasta"
+        genome_fasta="data/genome/Lbolanderi.fasta",
+        amb="data/genome/Lbolanderi.fasta.amb",
+        ann="data/genome/Lbolanderi.fasta.ann",
+        bwt="data/genome/Lbolanderi.fasta.bwt",
+        pac="data/genome/Lbolanderi.fasta.pac",
+        sa="data/genome/Lbolanderi.fasta.sa"
     output:
         sam=temp("results/mapped/{sample}.sam")
     params:
@@ -238,6 +246,8 @@ rule bwa_mem:
         runtime= "18h",
         mem_mb= 115200,
         tmpdir="$SNIC_TMP"
+    benchmark:
+        "benchmark/bwa_mem/{sample}.bwa_mem.txt"
     singularity:
         "containers/bwa_0.7.18.sif",
     shell:
@@ -259,6 +269,8 @@ rule samtools_sam:
         threads= 10,
         runtime= "10h",
         tmpdir="$SNIC_TMP"
+    benchmark:
+        "benchmark/samtools_sam/{sample}.samtools_sam.txt"
     singularity:
         "containers/samtools_1.20.c.sif"
     shell:
@@ -277,12 +289,12 @@ rule markduplicates_bam:
         dedupBam=protected("results/mapped_dedup/{sample}.dedup.bam"),
         metrics="results/mapped_dedup/{sample}.metrics.txt"
     resources:
-        threads=20,
-        mem_mb=120000,
+        threads=15,
         runtime="12h",
+        mem_mb=90000,
         tmpdir="$SNIC_TMP"
     params:
-        mem= "-Xmx120g"
+        mem= "-Xmx90g"
     benchmark:
         "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
     singularity:
@@ -295,50 +307,48 @@ rule markduplicates_bam:
         --CREATE_INDEX TRUE
         """
 
-# Create a list of intervals for scaffolds larger than 1000 bp to use with Haplotype Caller:
-# rule create_intervals:
-#     input:
-#         genome="data/genome/{genome}"
-#     output:
-#         intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 17)])
-#     params:
-#         min_scaf_len = 1000,
-#         num_scafs_per_interval = 4
-#     shell:
-#         """
-#         python workflow/scripts/split_fasta.py data/genome/{genome}.fasta {params.min_scaf_len} {params.num_scafs_per_interval} "config/intervals"
-#         """
+rule create_intervals:
+    input:
+        genome="data/genome/{genome}.fasta"
+    output:
+        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 71)])
+    params:
+        num_scafs_per_interval = 200
+    shell:
+        """
+        python workflow/scripts/split_fasta.py data/genome/{genome}.fasta {params.num_scafs_per_interval} "config/intervals"
+        """
 
-# rule HaplotypeCaller_gvcf:
-#     input:
-#         genome_fasta="data/genome/{genome}.fasta",
-#         genome_fasta_dict="data/genome/{genome}.dict",
-#         genome_index="data/genome/{genome}.fasta.fai",
-#         bam="results/mapped_dedup/{sample}.dedup.bam"
-#     output:
-#         gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
-#     resources:
-#         threads=10,
-#         mem_mb=64000,
-#         runtime="48h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx64g",
-#         interval="config/intervals/interval_{num}.bed"
-#     benchmark:
-#         "benchmark/gatk_haplotypecaller/{sample}.{num}.gatkHaplotypeCaller.txt"
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} HaplotypeCaller \
-#         -R {input.genome_fasta} \
-#         -L {params.interval} \
-#         -I {input.bam} \
-#         -O {output} \
-#         --tmp-dir {resources.tmpdir} \
-#         -ERC GVCF
-#         """
+rule HaplotypeCaller_gvcf:
+    input:
+        genome_fasta="data/genome/{genome}.fasta",
+        genome_fasta_dict="data/genome/{genome}.dict",
+        genome_index="data/genome/{genome}.fasta.fai",
+        bam="results/mapped_dedup/{sample}.dedup.bam"
+    output:
+        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
+    resources:
+        threads=10,
+        mem_mb=64000,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx64g",
+        interval="config/intervals/interval_{num}.bed"
+        ploidy=lambda wildcards: get_ploidy(wildcards.sample)
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} HaplotypeCaller \
+        -R {input.genome_fasta} \
+        -L {params.interval} \
+        -I {input.bam} \
+        -O {output} \
+        --tmp-dir {resources.tmpdir} \
+        -ploidy {params.ploidy} \
+        -ERC GVCF
+        """
 
 # rule create_gdb_mapfile:
 #     input:
