@@ -1,35 +1,36 @@
 __author__ = "Homa Papoli Yazdi"
 __email__ = "homa.papoli_yazdi@biol.lu.se"
 
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 configfile: "config/config.yaml"
 localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals
 genome_name=config["genome"]
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 
-#----------------------------------------------------------------------------#
-#--------------------Import Python modules-----------------------------------#
-#----------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#--------------------Import Python modules---------------------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 import pandas as pd
 import os
-#----------------------------------------------------------------------------#
-#--------------------Reading design table------------------------------------#
-#----------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#--------------------Reading design table----------------------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 design_table = pd.read_table(config["sample_table"], sep="\t")
 sample_name = design_table.Sample_Name
 fastq_name = design_table.Fastq_Name
 ploidy_level = design_table.Ploidy
-#--------------------Function to get Read Group for each sample--------------#
+#--------------------Function to get Read Group for each sample------------------------------------------------------------------------------------#
 def get_readgroup(sample_name):
     read_group = pd.read_table("config/ReadGroup.txt", sep="\t")
     read_group_dict = dict(read_group.values)
     return read_group_dict[sample_name]
-#----------------------------------------------------------------------------#
-#------------------Function to get Ploidy level for each sample--------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+#------------------Function to get Ploidy level for each sample------------------------------------------------------------------------------------#
 def get_ploidy(sample_name):
     design_table = pd.read_table(config["sample_table"], sep="\t")
     ploidy_dict = dict(zip(design_table.Fastq_Name, design_table.Ploidy))
     return ploidy_dict[sample_name]
-#----------------------------------------------------------------------------#
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule all:
     input: 
         html_output = expand([
@@ -53,14 +54,12 @@ rule all:
         "results/mapped/{sample}.flagstats.txt",
         "results/mapped/{sample}.idxstat.txt",
         "results/mapped_dedup/{sample}.dedup.bam",
-        "results/mapped_dedup/{sample}.metrics.txt"
+        "results/mapped_dedup/{sample}.metrics.txt",
+        "config/intervals/interval_{num}.bed",
+        "results/gvcf/{sample}/{sample}.{num}.gvcf"
         ], \
-        sample=fastq_name, pair=config["pair"], genome=config["species"], num=[i for i in range(1, 2)])#17)])
-
-#         "config/intervals/interval_{num}.bed",
-#         "data/genome/{genome}.dict",
-#         "data/genome/{genome}.fasta.fai",
-#         "results/gvcf/{sample}/{sample}.{num}.gvcf"
+        sample=fastq_name, pair=config["pair"], genome=config["species"], num=[i for i in range(1, 2)])#47)])
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 
 rule edit_assemblies:
     input:
@@ -309,32 +308,33 @@ rule markduplicates_bam:
 
 rule create_intervals:
     input:
-        genome="data/genome/{genome}.fasta"
+        genome="data/genome/Lbolanderi.fasta"
     output:
-        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 71)])
+        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 47)])
     params:
-        num_scafs_per_interval = 200
+        num_scafs_per_interval = 300,
+        intervals_dir="config/intervals"
     shell:
         """
-        python workflow/scripts/split_fasta.py data/genome/{genome}.fasta {params.num_scafs_per_interval} "config/intervals"
+        python workflow/scripts/split_fasta.py {input.genome} {params.num_scafs_per_interval} {params.intervals_dir}
         """
 
 rule HaplotypeCaller_gvcf:
     input:
-        genome_fasta="data/genome/{genome}.fasta",
-        genome_fasta_dict="data/genome/{genome}.dict",
-        genome_index="data/genome/{genome}.fasta.fai",
+        genome_fasta="data/genome/Lbolanderi.fasta",
+        genome_fasta_dict="data/genome/Lbolanderi.dict",
+        genome_index="data/genome/Lbolanderi.fasta.fai",
         bam="results/mapped_dedup/{sample}.dedup.bam"
     output:
-        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
+        gvcf=temp("results/gvcf/{sample}/{sample}.{num}.gvcf")
     resources:
-        threads=10,
-        mem_mb=64000,
-        runtime="48h",
+        threads=4,
+        mem_mb=24000,
+        runtime="10h",
         tmpdir="$SNIC_TMP"
     params:
-        mem= "-Xmx64g",
-        interval="config/intervals/interval_{num}.bed"
+        mem= "-Xmx24g",
+        interval="config/intervals/interval_{num}.bed",
         ploidy=lambda wildcards: get_ploidy(wildcards.sample)
     singularity:
         "containers/gatk_4.6.0.0.sif"
@@ -342,11 +342,11 @@ rule HaplotypeCaller_gvcf:
         """
         gatk --java-options {params.mem} HaplotypeCaller \
         -R {input.genome_fasta} \
-        -L {params.interval} \
         -I {input.bam} \
-        -O {output} \
-        --tmp-dir {resources.tmpdir} \
+        -O {output.gvcf} \
+        -L {params.interval} \
         -ploidy {params.ploidy} \
+        --tmp-dir {resources.tmpdir} \
         -ERC GVCF
         """
 
