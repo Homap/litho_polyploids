@@ -3,7 +3,7 @@ __email__ = "homa.papoli_yazdi@biol.lu.se"
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 configfile: "config/config.yaml"
-localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals
+localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals, create_gdb_mapfile
 genome_name=config["genome"]
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 
@@ -56,11 +56,14 @@ rule all:
         "results/mapped_dedup/{sample}.dedup.bam",
         "results/mapped_dedup/{sample}.metrics.txt",
         "config/intervals/interval_{num}.bed",
-        "results/gvcf/{sample}/{sample}.{num}.gvcf"
+        "results/gvcf/{sample}/{sample}.{num}.gvcf",
+        "config/sample_map/interval_{num}.sample_map",
+        "results/genomicsdb/interval_{num}_gdb",
+        "results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}.vcf"
         ], \
-        sample=fastq_name, pair=config["pair"], genome=config["species"], num=[i for i in range(1, 2)])#47)])
+        sample=fastq_name, pair=config["pair"], genome=config["species"], num=range(1, 48))
+        # "results/vcf/Lbolanderi_246_Lglabrum_2_{num}_sorted.vcf"
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-
 rule edit_assemblies:
     input:
         genome = os.path.join("data/genome", (genome_name+".fasta"))
@@ -73,7 +76,7 @@ rule edit_assemblies:
         """
         python workflow/scripts/assembly_stats.py {params.species} {input.genome} {output.edited_genome} {output.genome_stats}
         """
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule fastqc:
     input:
        fastq="data/fastq/{sample}_{pair}_001.fastq.gz",
@@ -94,15 +97,15 @@ rule fastqc:
         --kmers 7 
         """
 
-rule multiqc:
-    input:
-        expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
-    output:
-        "results/multiqc/multiqc_report.html"
-    singularity:
-        "containers/multiqc_v1.25.sif"
-    shell:
-        "multiqc results/fastqc/*fastqc.zip -o results/multiqc"
+# rule multiqc:
+#     input:
+#         expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
+#     output:
+#         "results/multiqc/multiqc_report.html"
+#     singularity:
+#         "containers/multiqc_v1.25.sif"
+#     shell:
+#         "multiqc results/fastqc/*fastqc.zip -o results/multiqc"
 
 rule filtering_fastp:
     input:
@@ -164,19 +167,18 @@ rule fastqc_after_filtering:
         --adapters {params.sample_adapter}
         """
 
-rule multiqc_after_filtering:
-    input:
-        expand("results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip", sample=fastq_name, pair=config["pair"])
-    output:
-        "results/multiqc_filtered/multiqc_report.html"
-    singularity:
-        "containers/multiqc_v1.25.sif"
-    shell:
-        "multiqc results/fastqc_filtered/*filtered_fastqc.zip -o results/multiqc_filtered"
-
-# ---------------------------------------------------------------------------------------------#
+# rule multiqc_after_filtering:
+#     input:
+#         expand("results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip", sample=fastq_name, pair=config["pair"])
+#     output:
+#         "results/multiqc_filtered/multiqc_report.html"
+#     singularity:
+#         "containers/multiqc_v1.25.sif"
+#     shell:
+#         "multiqc results/fastqc_filtered/*filtered_fastqc.zip -o results/multiqc_filtered"
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 # Create Genome Indices
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule bwa_index:
     input:
         "data/genome/{genome}.fasta",
@@ -223,9 +225,9 @@ rule createSeqfai:
         """
         samtools faidx {input}
         """
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 # Mapping
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule bwa_mem:
     input:
         fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
@@ -253,9 +255,9 @@ rule bwa_mem:
         """
         bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} > {output.sam}
         """
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 # SAM to BAM - Sorting - Getting BAM statistics
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule samtools_sam:
     input:
         sam="results/mapped/{sample}.sam"
@@ -278,9 +280,9 @@ rule samtools_sam:
         samtools sort {input.sam} -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
         samtools idxstats {output.bam} > {output.idxstat}
         """
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 # Mark duplicates in BAM file
-# ---------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule markduplicates_bam:
     input:
         bam="results/mapped/{sample}.sorted.bam"
@@ -305,12 +307,12 @@ rule markduplicates_bam:
         --ASSUME_SORT_ORDER coordinate \
         --CREATE_INDEX TRUE
         """
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule create_intervals:
     input:
         genome="data/genome/Lbolanderi.fasta"
     output:
-        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 47)])
+        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 48)])
     params:
         num_scafs_per_interval = 300,
         intervals_dir="config/intervals"
@@ -318,7 +320,7 @@ rule create_intervals:
         """
         python workflow/scripts/split_fasta.py {input.genome} {params.num_scafs_per_interval} {params.intervals_dir}
         """
-
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule HaplotypeCaller_gvcf:
     input:
         genome_fasta="data/genome/Lbolanderi.fasta",
@@ -326,14 +328,14 @@ rule HaplotypeCaller_gvcf:
         genome_index="data/genome/Lbolanderi.fasta.fai",
         bam="results/mapped_dedup/{sample}.dedup.bam"
     output:
-        gvcf=temp("results/gvcf/{sample}/{sample}.{num}.gvcf")
+        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
     resources:
-        threads=4,
-        mem_mb=24000,
-        runtime="10h",
+        threads=2,
+        mem_mb=12000,
+        runtime="24h",
         tmpdir="$SNIC_TMP"
     params:
-        mem= "-Xmx24g",
+        mem= "-Xmx12g",
         interval="config/intervals/interval_{num}.bed",
         ploidy=lambda wildcards: get_ploidy(wildcards.sample)
     singularity:
@@ -349,80 +351,98 @@ rule HaplotypeCaller_gvcf:
         --tmp-dir {resources.tmpdir} \
         -ERC GVCF
         """
-
-# rule create_gdb_mapfile:
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_gdb_mapfile:
+    input:
+        design_table=config["sample_table"]
+    output:
+        expand("config/sample_map/interval_{num}.sample_map", num=range(1, 48))
+    run:
+        design_table = pd.read_table(input.design_table, sep="\t")
+        fastq_name = design_table.Fastq_Name
+        for num in range(1, 48):
+            sample_map = f"config/sample_map/interval_{num}.sample_map"
+            with open(sample_map, "w") as sample_map_file:
+                for fqname in fastq_name:
+                    sample_map_file.write(f"{fqname}\tresults/gvcf/{fqname}/{fqname}.{num}.gvcf\n")
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule genomicsdbimport:
+    input:
+        sample_map="config/sample_map/interval_{num}.sample_map"
+    output:
+        db=directory("results/genomicsdb/interval_{num}_gdb")
+    resources:
+        threads=1,
+        mem_mb=6400,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx6g",
+        interval="config/intervals/interval_{num}.bed",
+        sample_map="config/sample_map/interval_{num}.sample_map"
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} GenomicsDBImport \
+        --genomicsdb-workspace-path {output.db} \
+        --intervals {params.interval} \
+        --batch-size 50 \
+        --sample-name-map {params.sample_map} \
+        --tmp-dir {resources.tmpdir} 
+        """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule GenotypeGVCFs:
+    input:
+        db="results/genomicsdb/interval_{num}_gdb",
+        genome_fasta="data/genome/Lbolanderi.fasta"
+    output:
+        vcf="results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}.vcf"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx24g",
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} GenotypeGVCFs \
+        -R {input.genome_fasta} \
+        -V gendb://{input.db} \
+        -O {output.vcf} \
+        --tmp-dir {resources.tmpdir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule SortVCFs:
 #     input:
-#         gvcf="results/gvcf/${sample}/${sample}.interval_${interval}.gvcf"
+#         vcf="results/vcf/Lbolanderi_246_Lglabrum_2_{num}.vcf"
 #     output:
-#         sample_map="config/sample_map/interval_{num}.sample_map"
-#     shell:
-#     """
-#         for interval in {1..70}
-#         do
-#         cat sample_design_table.tsv | while read line
-#         do 
-#         sample=$(echo $line | cut -f1 -d " ")
-#         echo -e ${sample}'\t'results/gvcf/${sample}/${sample}.interval_${interval}.gvcf \
-#         >> config/sample_map/interval_${interval}.sample_map 
-#         done
-#         done
-#     """
-
-
-# # Let's do two types of genotyping.One with all samples together, and one per each family.
-# rule genomicsdbimport:
-#     input:
-#         sample_map="config/sample_map/interval_{num}.sample_map"
-#     output:
-#         db=directory("results/genomicsdb/interval_{num}_gdb")
+#         vcf_sorted=temp()"results/vcf/Lbolanderi_246_Lglabrum_2_{num}_sorted.vcf")
 #     resources:
-#         threads=10,
-#         mem_mb=64000,
+#         threads=4,
+#         mem_mb=24000,
 #         runtime="48h",
 #         tmpdir="$SNIC_TMP"
 #     params:
-#         mem= "-Xmx64g",
-#         interval="config/intervals/interval_{num}.bed"
-#     benchmark:
-#         "benchmark/gatk_haplotypecaller/{sample}.{num}.genomicsdbimport.txt"
+#         genome_fasta_dict="data/genome/Lbolanderi.dict",
+#         mem= "-Xmx24g",
 #     singularity:
 #         "containers/gatk_4.6.0.0.sif"
 #     shell:
 #         """
-#         gatk --java-options {params.mem} GenomicsDBImport \
-#         --genomicsdb-workspace-path {output} \
-#         --intervals {params.interval} \
-#         --batch-size 50 \
-#         --sample-name-map {input.sample_map} \
-#         --tmp-dir {resources.tmpdir} \
-#         --reader-threads {resources.threads}
-#         """
-
-# rule GenotypeGVCFs:
-#     input:
-#         db="results/genomicsdb/interval_{num}_gdb"
-#         genome_fasta="data/genome/{genome}.fasta"
-#     output:
-#         vcf="results/vcf/ostrich_families_{num}.vcf"
-#     resources:
-#         threads=10,
-#         mem_mb=64000,
-#         runtime="48h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx64g",
-#         interval="config/intervals/interval_{num}.bed"
-#     benchmark:
-#         "benchmark/gatk_haplotypecaller/{sample}.{num}.genotypeGVCF.txt"
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} GenotypeGVCFs \
-#         -R {input.genome_fasta} \
-#         -V gendb://{input.db} \
-#         -O {output}
+#         gatk --java-options {params.mem} SortVcf \ #Maybe picard
+#         -I {input.vcf} \
+#         -O {output.vcf_sorted} \
+#         -SD {params.genome_fasta_dict} \
 #         --tmp-dir {resources.tmpdir}
 #         """
-
-
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule concatenate_VCF:
+# rule select_filter_variants:
+# rule filterVariants:
+# rule variant_statistics:
+# rule plot_SNP_statistics:
+# rule bcftools filter: #bcftools can handle polyploids
