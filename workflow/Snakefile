@@ -3,7 +3,7 @@ __email__ = "homa.papoli_yazdi@biol.lu.se"
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 configfile: "config/config.yaml"
-localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals, create_gdb_mapfile
+localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals, create_gdb_mapfile, create_sorted_vcf_list, get_dist_plots
 genome_name=config["genome"]
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 
@@ -12,6 +12,7 @@ genome_name=config["genome"]
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 #--------------------Reading design table----------------------------------------------------------------------------------------------------------#
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -19,6 +20,9 @@ design_table = pd.read_table(config["sample_table"], sep="\t")
 sample_name = design_table.Sample_Name
 fastq_name = design_table.Fastq_Name
 ploidy_level = design_table.Ploidy
+fastq_names_with_ploidy_2 = ",".join(design_table[(design_table['Ploidy'] == 2) & (~design_table['Sample_Name'].str.startswith('GLA'))]['Fastq_Name'].tolist())
+fastq_names_with_ploidy_4 = ",".join(design_table[design_table['Ploidy'] == 4]['Fastq_Name'].tolist())
+fastq_names_with_ploidy_6 = ",".join(design_table[design_table['Ploidy'] == 6]['Fastq_Name'].tolist())
 #--------------------Function to get Read Group for each sample------------------------------------------------------------------------------------#
 def get_readgroup(sample_name):
     read_group = pd.read_table("config/ReadGroup.txt", sep="\t")
@@ -59,10 +63,24 @@ rule all:
         "results/gvcf/{sample}/{sample}.{num}.gvcf",
         "config/sample_map/interval_{num}.sample_map",
         "results/genomicsdb/interval_{num}_gdb",
-        "results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}.vcf"
-        ], \
-        sample=fastq_name, pair=config["pair"], genome=config["species"], num=range(1, 48))
-        # "results/vcf/Lbolanderi_246_Lglabrum_2_{num}_sorted.vcf"
+        "results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}.vcf",
+        "results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted.vcf",
+        "results/cat_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted.vcf.gz",
+        "results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz",
+        "results/filtered_vcf/depth_diploid.txt",
+        "results/filtered_vcf/depth_tetraploid.txt",
+        "results/filtered_vcf/depth_hexaploid.txt",
+        "results/filtered_vcf/info_field.txt",
+        "config/total_mapped_reads.txt",
+        "results/filtered_vcf/info_plots_grid.pdf",
+        "results/filtered_vcf/diploid_tetra_hexa_ratio.pdf",
+        "results/filtered_vcf/summary_statistics_with_ploidy.csv",
+        "results/filtered_vcf/summary_statistics_depth_allVCF.csv",
+        "results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter.vcf.gz",
+        "results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed.vcf.gz",
+        "results/filtered_vcf/passed_snp_count.txt",
+        "results/filtered_vcf/info_field_passed.txt"
+        ], sample=fastq_name, pair=config["pair"], genome=config["species"], num=range(1, 48))
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule edit_assemblies:
     input:
@@ -391,7 +409,7 @@ rule genomicsdbimport:
         --sample-name-map {params.sample_map} \
         --tmp-dir {resources.tmpdir} 
         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule GenotypeGVCFs:
     input:
         db="results/genomicsdb/interval_{num}_gdb",
@@ -416,33 +434,234 @@ rule GenotypeGVCFs:
         --tmp-dir {resources.tmpdir}
         """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule SortVCFs:
+rule SortVCFs:
+    input:
+        vcf="results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}.vcf"
+    output:
+        vcf_sorted="results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted.vcf"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        genome_fasta_dict="data/genome/Lbolanderi.dict",
+        mem= "-Xmx24g",
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} SortVcf -I {input.vcf} -O {output.vcf_sorted} -SD {params.genome_fasta_dict} --TMP_DIR {resources.tmpdir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Create a list for concatenate_VCF
+rule create_sorted_vcf_list:
+    output:
+        sorted_vcf_list="config/vcf_list/sorted_vcf.list"
+    shell:
+        """
+        for i in {{1..47}}
+        do 
+        echo results/vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_${{i}}_sorted.vcf >> {output.sorted_vcf_list}
+        done
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule concatenate_VCF:
+    input:
+        vcf_list="config/vcf_list/sorted_vcf.list"
+    output:
+        concat_vcf="results/cat_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted.vcf.gz"
+    resources:
+        threads=2,
+        runtime="12h",
+        mem_mb=12000,
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx12g"
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java {params.mem} -jar /usr/picard/picard.jar MergeVcfs \
+        --INPUT {input.vcf_list} \
+        --OUTPUT {output.concat_vcf}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule keep_biallelic_SNPs:
+    input:
+        concat_vcf="results/cat_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted.vcf.gz"
+    output:
+        snp_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz"
+    resources:
+        threads=2,
+        runtime="12h",
+        mem_mb=12000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools view -m2 -M2 -v snps {input.concat_vcf} --output-type z --output {output.snp_vcf}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule index_vcf:
+    input:
+        vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz"
+    output:
+        index="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz.tbi"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx24g",
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.vcf} 
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_info_field:
+    input:
+        biallelic_snp_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz"
+    output:
+        info_field="results/filtered_vcf/info_field.txt"
+    resources:
+        threads=1,
+        runtime="12h",
+        mem_mb=6000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools query -f '%CHROM\\t%POS\\t%AF\\t%BaseQRankSum\\t%DP\\t%ExcessHet\\t%FS\\t%InbreedingCoeff\\t%MQ\\t%MQRankSum\\t%QD\\t%ReadPosRankSum\\t%SOR\\n' {input.biallelic_snp_vcf} > {output.info_field}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_depth:
+    input:
+        biallelic_snp_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz"
+    output:
+        depth_diploid="results/filtered_vcf/depth_diploid.txt",
+        depth_tetraploid="results/filtered_vcf/depth_tetraploid.txt",
+        depth_hexaploid="results/filtered_vcf/depth_hexaploid.txt",
+        total_mapped_reads="config/total_mapped_reads.txt"
+    params:
+        samples_2x=fastq_names_with_ploidy_2,
+        samples_4x=fastq_names_with_ploidy_4,
+        samples_6x=fastq_names_with_ploidy_6
+    resources:
+        threads=1,
+        runtime="12h",
+        mem_mb=6000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_2x} {input.biallelic_snp_vcf} > {output.depth_diploid}
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_4x} {input.biallelic_snp_vcf} > {output.depth_tetraploid}
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_6x} {input.biallelic_snp_vcf} > {output.depth_hexaploid}
+
+        sed -i 's/\\./0/g' {output.depth_diploid}
+        sed -i 's/\\./0/g' {output.depth_tetraploid} 
+        sed -i 's/\\./0/g' {output.depth_hexaploid}
+
+        grep '+ 0 mapped' results/mapped/*flagstats.txt | cut -f1 -d " " | cut -f3 -d "/" | sed 's/.flagstats.txt:/ /g' | awk 'BEGIN{{print "sample","totalreads"}}{{print $0}}' > {output.total_mapped_reads}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_dist_plots:
+    input:
+        info_field="results/filtered_vcf/info_field.txt",
+        depth_diploid="results/filtered_vcf/depth_diploid.txt",
+        depth_tetraploid="results/filtered_vcf/depth_tetraploid.txt",
+        depth_hexaploid="results/filtered_vcf/depth_hexaploid.txt"
+    output:
+        info_plots="results/filtered_vcf/info_plots_grid.pdf",
+        depth_output="results/filtered_vcf/diploid_tetra_hexa_ratio.pdf",
+        summary_depth_stats="results/filtered_vcf/summary_statistics_with_ploidy.csv",
+        summary_stats_depth_allVCF="results/filtered_vcf/summary_statistics_depth_allVCF.csv"
+    shell:
+        """
+        module load R/4.3.2
+        Rscript workflow/scripts/snp_metrics_dist.R
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule gatk_variant_filter:
+    # For DP filtering, I take two times the median of total depth as the maximum and half of it as the minimum (median(sampled_diploid_data$total_depth))
+    input:
+        vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz",
+        index="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic.vcf.gz.tbi",
+        reference="data/genome/Lbolanderi.fasta"
+    output:
+        filtered_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter.vcf.gz"
+    params:
+        mem="-Xmx12g"
+    resources:
+        threads=2,
+        mem_mb=12000,
+        runtime="24h",
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options "{params.mem}" VariantFiltration \
+            -R {input.reference} \
+            -V {input.vcf} \
+            --filter-expression "QUAL < 30.0" --filter-name "VeryLowQual" \
+            --filter-expression "QD < 5.0" --filter-name "LowQD" \
+            --filter-expression "FS > 60.0" --filter-name "StrandBiasFishers" \
+            --filter-expression "MQ < 40.0" --filter-name "MappingQuality" \
+            --filter-expression "MQRankSum < -12.5" --filter-name "MQRankSum" \
+            --filter-expression "ReadPosRankSum < -8.0" --filter-name "ReadPosRankSum" \
+            --filter-expression "SOR > 3.0" --filter-name "SOR" \
+            --filter-expression "DP < 594" --filter-name "DPtoolow" \
+            --filter-expression "DP > 2376" --filter-name "DPtoohigh" \
+            -O {output.filtered_vcf}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule filter_and_count_snps:
+    input:
+        filtered_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter.vcf.gz"
+    output:
+        clean_vcf="results/filtered_vcf/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed.vcf.gz",
+        snp_count="results/filtered_vcf/passed_snp_count.txt",
+        info_field_passed="results/filtered_vcf/info_field_passed.txt"
+    resources:
+        threads=1,
+        runtime="12h",
+        mem_mb=6000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        # Remove "FAIL" flagged variants and output a clean VCF
+        bcftools view -f PASS {input.filtered_vcf} -o {output.clean_vcf} -O z
+
+        # Index the clean VCF
+        bcftools index {output.clean_vcf}
+
+        # Count the remaining SNPs
+        bcftools view -v snps {output.clean_vcf} | grep -vc "^#" > {output.snp_count} 
+
+        bcftools query -f '%CHROM\\t%POS\\t%AF\\t%BaseQRankSum\\t%DP\\t%ExcessHet\\t%FS\\t%InbreedingCoeff\\t%MQ\\t%MQRankSum\\t%QD\\t%ReadPosRankSum\\t%SOR\\n' {input.filtered_vcf} > {output.info_field_passed}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule remove_repeats:
 #     input:
-#         vcf="results/vcf/Lbolanderi_246_Lglabrum_2_{num}.vcf"
+    # grep -v "#" ../../data/genome/repeatmask/Struthio_camelus.20130116.OM.fa.out.gff | \
+    # awk 'BEGIN{print "chrom""\t""chromStart""\t""chromEnd"}{print $1"\t"$4-1"\t"$5}' > ../../data/bed/ostrich_repeats.bed
+    # bcftools view -T ^../../data/bed/ostrich_repeats.bed ${variant_VCF} -O z -o ${output_path}/${output_prefix}_vcf.filtered.repeatmasked.vcf.gz
+
 #     output:
-#         vcf_sorted=temp()"results/vcf/Lbolanderi_246_Lglabrum_2_{num}_sorted.vcf")
-#     resources:
-#         threads=4,
-#         mem_mb=24000,
-#         runtime="48h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         genome_fasta_dict="data/genome/Lbolanderi.dict",
-#         mem= "-Xmx24g",
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
 #     shell:
-#         """
-#         gatk --java-options {params.mem} SortVcf \ #Maybe picard
-#         -I {input.vcf} \
-#         -O {output.vcf_sorted} \
-#         -SD {params.genome_fasta_dict} \
-#         --tmp-dir {resources.tmpdir}
-#         """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule all_samples_PCA:
+#     input:
+#     output:
+#     shell:
 # #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule concatenate_VCF:
-# rule select_filter_variants:
-# rule filterVariants:
-# rule variant_statistics:
-# rule plot_SNP_statistics:
-# rule bcftools filter: #bcftools can handle polyploids
