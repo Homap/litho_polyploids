@@ -4,7 +4,8 @@ __email__ = "homa.papoli_yazdi@biol.lu.se"
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 configfile: "config/config.yaml"
 localrules: all, edit_assemblies, multiqc, multiqc_after_filtering, multiqc_after_filtering_bbtools, create_intervals, create_gdb_mapfile, \
-create_sorted_vcf_list, get_dist_plots, remove_contig_000891F_1854_INT45, glPCA_structure_input, gene_vcf, per_sample_gene_vcf, edit_sample_name_gene_vcf
+create_sorted_vcf_list, get_dist_plots, remove_contig_000891F_1854_INT45, glPCA_structure_input, gene_vcf, per_sample_gene_vcf, edit_sample_name_gene_vcf, \
+extract_only_phased_SNPs_vcf, remove_snps_overlapping_repeats
 genome_name=config["genome"]
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 
@@ -103,17 +104,19 @@ rule all:
         "results/filtered_vcf_poly/passed_snp_count.txt",
         "results/filtered_vcf_poly/info_field_passed.txt",
         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz",
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz",
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp",
-        "data/annotation/genes.bed",
-        "results/grampa/gene_vcf/gene.vcf.gz",
-        "results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz",
-        "results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz",
-        "results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz",
-        "results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz"
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_noRepeats.poly.vcf.gz"
         ], sample=fastq_name, pair=config["pair"], genome=config["species"], num=range(1, 48), diploid=diploid_sample_names, tetraploid=tetraploid_sample_names, hexaploid=hexaploid_sample_names)
         # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_diploids_poly.vcf.gz",
         # "results/LD_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly",
+        # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz",
+        # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp",
+        # "data/annotation/gene.bed",
+        # "results/grampa/gene_vcf/gene.vcf.gz",
+        # "results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz",
+        # "results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz",
+        # "results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz",
+        # "results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz",
+        # "results/grampa/gene_vcf/{sample}/{sample}.ps_values.txt"
 # #--------------------------------------------------------------------------------------------------------------------------------------------------#
 # rule edit_assemblies:
 #     input:
@@ -753,350 +756,60 @@ rule remove_snps_with_missing:
         bcftools view -e 'F_MISSING > 0' {input} -o {output} -Oz
         """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule remove_repeats:
-#     input:
-#     grep -v "#" ../../data/genome/repeatmask/Struthio_camelus.20130116.OM.fa.out.gff | \
-#     awk 'BEGIN{print "chrom""\t""chromStart""\t""chromEnd"}{print $1"\t"$4-1"\t"$5}' > ../../data/bed/ostrich_repeats.bed
-    
-#     output:
-#     resources:
-#         threads=1,
-#         runtime="12h",
-#         mem_mb=6000,
-#         tmpdir="$SNIC_TMP"
-#     singularity:
-#         "containers/bcftools_1.21.sif"
-#     shell:
-#     """
-#     bcftools view -T ^../../data/bed/ostrich_repeats.bed ${variant_VCF} -O z -o ${output_path}/${output_prefix}_vcf.filtered.repeatmasked.vcf.gz
-#     """
+rule remove_snps_overlapping_repeats:
+    input: 
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz"
+    output:
+        protected("results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_noRepeats.poly.vcf.gz")
+    params:
+        repeatfile="data/repeats/ps_225_001.polished_assembly.fasta.out.gff"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        grep -v "#" {params.repeatfile} | sed "s/|/_/g" | awk '{{if ($1 ~ /_arrow$/) {{gsub("_arrow", "", $1); $1 = "contig_" $1}} print $0}}' OFS="\\t" | awk '{{print $1"\\t"$4-1"\\t"$5}}' > data/repeats/Lbolanderi_repeats.bed
+        bcftools view -T ^data/repeats/Lbolanderi_repeats.bed {input} -O z -o {output}
+        bcftools view -T data/repeats/Lbolanderi_repeats.bed {input} -o results/filtered_vcf_poly/repeats_excluded_snps.vcf
+        bcftools index -t -f {output}
+        """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule subset_only_diploids:
+# rule ld_prunning:
 #     input:
 #         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz"
 #     output:
-#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_diploids_poly.vcf.gz"
-#     params:
-#         sample_list="config/sample_list_ld_poly.txt"
+#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
 #     resources:
-#         threads=1,
+#         threads=2,
 #         runtime="12h",
-#         mem_mb=6000,
+#         mem_mb=12000,
 #         tmpdir="$SNIC_TMP"
 #     singularity:
 #         "containers/bcftools_1.21.sif"
 #     shell:
 #         """
-#         bcftools view -S {params.sample_list} {input} -o {output} -Oz
+#         bcftools +prune -m 0.4 -w 1000 -e 'F_MISSING>0' {input} -o {output} -Oz
 #         """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule ld_decay_for_diploids:
-#     input:
-#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_diploids_poly.vcf.gz"
-#     output:
-#         "results/LD_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly"
-#     resources:
-#         threads=10,
-#         runtime="24h",
-#         mem_mb=60000,
-#         tmpdir="$SNIC_TMP"
-#     singularity:
-#         "containers/vcftools_v0.1.16-1-deb_cv1.sif"
-#     shell:
-#         """
-#         vcftools --gzvcf {input} --geno-r2 --ld-window-bp 50000 --out {output}
-#         """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule ld_prunning:
-    input:
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz"
-    output:
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
-    resources:
-        threads=2,
-        runtime="12h",
-        mem_mb=12000,
-        tmpdir="$SNIC_TMP"
-    singularity:
-        "containers/bcftools_1.21.sif"
-    shell:
-        """
-        bcftools +prune -m 0.4 -w 1000 -e 'F_MISSING>0' {input} -o {output} -Oz
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule glPCA_structure_input:
-    input:
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
-    output:
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp"
-    shell:
-        """
-        python workflow/scripts/glPCA_STRUCTURE_input_mixploidyVCF_poly.py {input} > {output}
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule all_samples_PCA:
-#     input:
-#     output:
-#     shell:It is a R script. 
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule treemix:
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule glPCA_input:
 #     input:
 #         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
 #     output:
-#         ""
-
-
-# # What do I need for Treemix?
-# setwd("~/treemix/") # of course this needs to be adjusted
-# prefix=ow=c(2,3))
-# prefix="genotypes_treemix"
-# library(RColorBrewer)
-# library(R.utils)
-# source("plotting_functions.R") # here you need to add the path
-# pdf("genotype_treemix_new.pdf", width = 10, height = 8)
-# par(mfrow=c(2,3))
-# for(edge in 0:5){
-#   plot_tree(cex=0.8,paste0(prefix,".",edge))
-#   title(paste(edge,"edges"))
-# }
-# dev.off()
-# for(edge in 0:5){
-#  plot_resid(stem=paste0(prefix,".",edge),pop_order="dogs.list")
-# }
-
-
-# # Treemix does not like missing data - remove missing data
-# singularity exec ../containers/vcftools_v0.1.16-1-deb_cv1.sif vcftools --gzvcf contig_000000F.vcf.gz --min-alleles 2 --max-alleles 2 --remove-filtered-all --max-missing 1 --recode --stdout | gzip -c > contig_000000F_filtered.vcf.gz
-# # Prune SNPs in high LD
-# singularity exec ../containers/plink_1.9.beta.6.10.sif /opt/view/bin/plink --vcf contig_000000F_filtered.vcf --double-id --allow-extra-chr --chr-set 1 --set-missing-var-ids @:#  --indep-pairwise 50 10 0.1 --noweb --out contig_000000F_prun
-# sed -i 's/:/\t/g' contig_000000F_prun.prune.in
-# singularity exec ../containers/vcftools_v0.1.16-1-deb_cv1.sif vcftools --vcf contig_000000F_filtered.vcf --positions contig_000000F_prun.prune.in --stdout --recode > contig_000000F_filtered.LDpruned.vcf
-
-# gzip contig_000000F_filtered.LDpruned.vcf
-
-# singularity exec ../containers/bcftools_1.21.sif bcftools query -l contig_000000F_filtered.LDpruned.vcf.gz : Then made it manually
-
-# module load python/2.7.6
-# bash vcf2treemix.sh contig_000000F_filtered.LDpruned.vcf.gz lbolander.clust
-
-# bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' input.vcf > genotypes.txt
-
-# sample1 sample2 sample3 sample4 sample5 sample6 sample7 sample8
-# 0/1 0/1 0/1 1/1 0/0 0/0 0/1 1/1
-# python mixploidy_vcf_2_treemix_input.py > ../../exploratory_temp/genotypes_treemix.frq
-# gzip genotypes_treemix.frq
-
-# for i in {0..5}
-# do
-# singularity exec ../containers/treemix_1.13.sif treemix -i genotypes_treemix.frq.gz -m $i -o genotypes_treemix.$i -root GLA -bootstrap -k 500 -noss > treemix_${i}_log &
-# done
-
-# for m in {1..10}; do
-#     for i in {1..10}; do
-#         # Generate random seed
-#         s=$RANDOM
-#         singularity exec ../containers/treemix_1.13.sif treemix -i genotypes_treemix.frq.gz -o treemix_out/genotypes_treemix.${i}.${m} -global -m $m -root GLA -k 500 -seed ${s} > treemix_${m}_${i}_log &
-#     done
-# done
-
-# module load R/4.3.2
-# library(SiZer)
-# library(OptM)
-# folder <- system.file("extdata", package = "OptM")
-# test.optM = optM(folder)
-# pdf("optimum_M.pdf")
-# plot_optM(test.optM, method = "Evanno")
-# dev.off()
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# GRAMPA
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule gene_vcf:
-    input:
-        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
-    output:
-        gene_bed="data/annotation/genes.bed",
-        gene_vcf="results/grampa/gene_vcf/gene.vcf.gz"
-    params:
-        annot="data/annotation/lbolanderi.tsebra.gtf"
-    singularity:
-        "containers/bcftools_1.21.sif"
-    shell:
-        """
-        bcftools index -t {input}
-        # Create bed file with gene coordinates
-        awk '$3 == "gene" {{print $1"\\t"$4-1"\\t"$5"\\t"$9}}' {params.annot} | awk '{{if ($1 ~ /_arrow$/) {{gsub("_arrow", "", $1); $1 = "contig_" $1}} print $0}}' | awk '{{print $1, $2, $3, $4}}' OFS='\\t' > {output.gene_bed}
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        # Subset VCF file with SNPs overlapping only genes
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        bcftools view -R {output.gene_bed} -Oz -o {output.gene_vcf} {input}
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule per_sample_gene_vcf:
-    input:
-        gene_vcf="results/grampa/gene_vcf/gene.vcf.gz"
-    output:
-        sample_gene_vcf=temp("results/grampa/gene_vcf/{sample}/{sample}.gene.temp.vcf")
-    singularity:
-        "containers/bcftools_1.21.sif"
-    shell:
-        """
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        # Subset gene VCF per individual
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        bcftools view -s {wildcards.sample} {input.gene_vcf} -o {output.sample_gene_vcf}
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule edit_sample_name_gene_vcf:
-    input:
-        sample_gene_vcf="results/grampa/gene_vcf/{sample}/{sample}.gene.temp.vcf"
-    output:
-        edited_sample_gene_vcf="results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz"
-    shell:
-        """
-        # Rename the sample in the VCF to match the sample name in BAM file
-        #--------------------------------------------------------------------------------------------------------------------------------------------------#
-        for vcf in {input.sample_gene_vcf}
-        do
-        prefix=$(echo $vcf | cut -f5 -d "/" | cut -f1 -d "." | cut -f1,2 -d "_")
-        sed "s/{wildcards.sample}/$prefix/g" $vcf > results/grampa/gene_vcf/{wildcards.sample}/{wildcards.sample}.gene.vcf
-        module load bioinfo-tools tabix/0.2.6
-        bgzip results/grampa/gene_vcf/{wildcards.sample}/{wildcards.sample}.gene.vcf
-        done
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# Phase the VCF file for diploids and polyploids
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule phase_diploid_gene_vcf:
-    input:
-        edited_sample_gene_vcf="results/grampa/gene_vcf/{diploid}/{diploid}.gene.vcf.gz"
-    output:
-        phased_sample_gene_vcf="results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz"
-    params:
-        bam_file="results/mapped_dedup/{diploid}.dedup.bam",
-        ref_file="data/genome/Lbolanderi.fasta"
-    resources:
-        threads=2,
-        runtime="12h",
-        mem_mb=12000,
-        tmpdir="$SNIC_TMP"
-    conda:
-        "envs/whatshap.yaml"
-    shell:
-        """
-        whatshap phase --vcf {input} --bam {params.bam_file} --reference {params.ref_file} --tag=PS --output {output} 
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule phase_tetraploid_gene_vcf:
-    input:
-        edited_sample_gene_vcf="results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.vcf.gz"
-    output:
-        phased_sample_gene_vcf="results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz"
-    params:
-        bam_file="results/mapped_dedup/{tetraploid}.dedup.bam",
-        ref_file="data/genome/Lbolanderi.fasta"
-    resources:
-        threads=2,
-        runtime="12h",
-        mem_mb=12000,
-        tmpdir="$SNIC_TMP"
-    conda:
-        "envs/whatshap.yaml"
-    shell:
-        """
-        whatshap polyphase --vcf {input} --bam {params.bam_file} --reference {params.ref_file} --ploidy 4 --tag=PS --output {output}
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-rule phase_hexaploid_gene_vcf:
-    input:
-        edited_sample_gene_vcf="results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.vcf.gz"
-    output:
-        phased_sample_gene_vcf="results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz"
-    params:
-        bam_file="results/mapped_dedup/{hexaploid}.dedup.bam",
-        ref_file="data/genome/Lbolanderi.fasta"
-    resources:
-        threads=2,
-        runtime="12h",
-        mem_mb=12000,
-        tmpdir="$SNIC_TMP"
-    conda:
-        "envs/whatshap.yaml"
-    shell:
-        """
-        whatshap polyphase --vcf {input} --bam {params.bam_file} --reference {params.ref_file} --ploidy 6 --tag=PS --output {output}
-        """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule extract_only_phased_SNPs_vcf:
-#     input:
-   # bcftools index -t {output.edited_sample_gene_vcf}
-#     output:
-
+#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp"
 #     shell:
-#         singularity exec ../containers/bcftools_1.21.sif bcftools query -f '[%CHROM\t%POS\t%PS\n]' phased_cds_subset.vcf.gz | grep -v '\.' | sort -kn3 -u > ps_values.txt
-#         while read ps; do
-#         output_file="haplotype_${ps}.vcf"
-#         bcftools view -i "FORMAT/PS=${ps}" phased_cds_subset.vcf.gz -o ${output_file} -O v
-#         done < ps_values.txt
+#         """
+#         python workflow/scripts/glPCA_input_mixploidyVCF_poly.py {input} > {output}
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule structure_input:
+#     input:
+#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
+#     output:
+#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp"
+#     shell:
+#         """
+#         python workflow/scripts/STRUCTURE_input_poly.py {input} > {output}
+#         """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# Per each gene coordinates in the starting bed file, create a separate vcf
-# singularity exec ../containers/bcftools_1.21.sif bcftools view -r contig_000000F:40594-43131 -i 'GT~"|"' phased_cds_subset.vcf.gz -o gene.vcf
-
-# #!/bin/bash
-
-# # Input files
-# REGION_FILE="regions.txt"
-# VCF_FILE="sample.vcf"
-
-# # Iterate through the region file
-# while read -r contig start ps_value group; do
-#     # Subset the VCF for the contig and PS field
-#     bcftools view -r "$contig" -i "PS=$ps_value" "$VCF_FILE" -o "sample.${group}.vcf" -Oz
-
-#     # Index the output VCF
-#     bcftools index "sample.${group}.vcf"
-# done < "$REGION_FILE"
-
-# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 1 -f ../data/genome/Lbolanderi.fasta -o gene_haplotypes1.fasta gene.vcf.gz # limit it to one scaffold
-# singularity exec ../containers/bedtools_2.31.0.sif bedtools getfasta -fi gene_haplotypes1.fasta -bed gene.bed -fo hap1_genes.fasta
-
-
-
-# name: sample1_g1.1_h1
-# name: sample1_g1.1_h2
-# name: sample2_g1.1_h1
-# name: sample2_g1.1_h2
-
-# name: sample1_g1.2_h2
-# name: sample2_g1.2_h1
-# name: sample2_g1.2_h2
-
-# You can have multiple haplotype blocks per gene in that case you cannot stitch them together.
-# Because if you use all SNPs of a gene and make one long haplotype while they belong to separate
-# haplotypes, you are creating nonsensical haplotypes. You can add the gene name to the
-# haplotype number which is derived from the left-most position. We can have two haplotypes per gene.
-
-
-
-# Then just create haplotypes per gene since each VCFs contain only haplo blocks
-
-# I will have one directory per individual and in that directionary, I have each haplotype called gene1_H1.fasta but the fasta header should be P18758_169_H1 but I give each sample a new name, so for example, P18758_169_H1 is a_H1.
-# Then across all samples, I concatenate per gene, all haplotypes. 
-# I align and then make a tree.
-# Now I will have a gene tree per each gene. I will have so many gene trees, each depicting a specific types of topology.
-# I put together all these gene trees and feed it to Grampa together with a species tree from Treemix.
-# I let the program run! and check the tree with the least score for parsimony
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# And after that
-# bgzip phased_cds_subset.vcf
-# tabix phased_cds_subset.vcf.gz
-# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 1 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype1.fasta
-# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 2 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype2.fasta
-# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 3 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype3.fasta
-# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 4 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype4.fasta
-
-#grep -w "CDS" ../../litho_genome/results/genome_annotation/braker.gtf | awk '{print $1"\t"$4-1"\t"$5"\t"$9}' | awk '{if ($1 ~ /_arrow$/) {gsub("_arrow", "", $1); $1 = "contig_" $1} print $0}' > cds_regions.bed
-#singularity exec ../containers/bcftools_1.21.sif bcftools view -R cds_cleaned_genes.bed -Oz -o snps_in_cds.vcf.gz ../results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz
 # Preparing the input files for running STRUCTURE
 # structure file format
 # 1 0 0 1 3 8 9 
@@ -1167,6 +880,268 @@ rule phase_hexaploid_gene_vcf:
 # cd ..
 # done
 # done
+
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# # rule treemix:
+# #     input:
+# #         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
+# #     output:
+# #         ""
+
+
+# # # What do I need for Treemix?
+# # setwd("~/treemix/") # of course this needs to be adjusted
+# # prefix=ow=c(2,3))
+# # prefix="genotypes_treemix"
+# # library(RColorBrewer)
+# # library(R.utils)
+# # source("plotting_functions.R") # here you need to add the path
+# # pdf("genotype_treemix_new.pdf", width = 10, height = 8)
+# # par(mfrow=c(2,3))
+# # for(edge in 0:5){
+# #   plot_tree(cex=0.8,paste0(prefix,".",edge))
+# #   title(paste(edge,"edges"))
+# # }
+# # dev.off()
+# # for(edge in 0:5){
+# #  plot_resid(stem=paste0(prefix,".",edge),pop_order="dogs.list")
+# # }
+
+
+# # # Treemix does not like missing data - remove missing data
+# # singularity exec ../containers/vcftools_v0.1.16-1-deb_cv1.sif vcftools --gzvcf contig_000000F.vcf.gz --min-alleles 2 --max-alleles 2 --remove-filtered-all --max-missing 1 --recode --stdout | gzip -c > contig_000000F_filtered.vcf.gz
+# # # Prune SNPs in high LD
+# # singularity exec ../containers/plink_1.9.beta.6.10.sif /opt/view/bin/plink --vcf contig_000000F_filtered.vcf --double-id --allow-extra-chr --chr-set 1 --set-missing-var-ids @:#  --indep-pairwise 50 10 0.1 --noweb --out contig_000000F_prun
+# # sed -i 's/:/\t/g' contig_000000F_prun.prune.in
+# # singularity exec ../containers/vcftools_v0.1.16-1-deb_cv1.sif vcftools --vcf contig_000000F_filtered.vcf --positions contig_000000F_prun.prune.in --stdout --recode > contig_000000F_filtered.LDpruned.vcf
+
+# # gzip contig_000000F_filtered.LDpruned.vcf
+
+# # singularity exec ../containers/bcftools_1.21.sif bcftools query -l contig_000000F_filtered.LDpruned.vcf.gz : Then made it manually
+
+# # module load python/2.7.6
+# # bash vcf2treemix.sh contig_000000F_filtered.LDpruned.vcf.gz lbolander.clust
+
+# # bcftools query -f '%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n' input.vcf > genotypes.txt
+
+# # sample1 sample2 sample3 sample4 sample5 sample6 sample7 sample8
+# # 0/1 0/1 0/1 1/1 0/0 0/0 0/1 1/1
+# # python mixploidy_vcf_2_treemix_input.py > ../../exploratory_temp/genotypes_treemix.frq
+# # gzip genotypes_treemix.frq
+
+# # for i in {0..5}
+# # do
+# # singularity exec ../containers/treemix_1.13.sif treemix -i genotypes_treemix.frq.gz -m $i -o genotypes_treemix.$i -root GLA -bootstrap -k 500 -noss > treemix_${i}_log &
+# # done
+
+# # for m in {1..10}; do
+# #     for i in {1..10}; do
+# #         # Generate random seed
+# #         s=$RANDOM
+# #         singularity exec ../containers/treemix_1.13.sif treemix -i genotypes_treemix.frq.gz -o treemix_out/genotypes_treemix.${i}.${m} -global -m $m -root GLA -k 500 -seed ${s} > treemix_${m}_${i}_log &
+# #     done
+# # done
+
+# # module load R/4.3.2
+# # library(SiZer)
+# # library(OptM)
+# # folder <- system.file("extdata", package = "OptM")
+# # test.optM = optM(folder)
+# # pdf("optimum_M.pdf")
+# # plot_optM(test.optM, method = "Evanno")
+# # dev.off()
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# # GRAMPA
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule gene_vcf: # might need to delete this
+#     input:
+#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
+#     output:
+#         gene_bed="data/annotation/gene.bed",
+#         gene_vcf="results/grampa/gene_vcf/gene.vcf.gz"
+#     params:
+#         annot="data/annotation/braker.gtf"
+#     singularity:
+#         "containers/bcftools_1.21.sif"
+#     shell:
+#         """
+#         bcftools index -t -f {input}
+#         # Create bed file with gene coordinates
+#         awk '$3 == "CDS" {{print $1"\\t"$4-1"\\t"$5"\\t"$10}}' {params.annot} | sed "s/;//g" | awk '{{if ($1 ~ /_arrow$/) {{gsub("_arrow", "", $1); $1 = "contig_" $1}} print $0}}' | awk '{{print $1, $2, $3, $4}}' OFS='\\t' > {output.gene_bed}
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         # Subset VCF file with SNPs overlapping only genes
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         bcftools view -R {output.gene_bed} -Oz -o {output.gene_vcf} {input}
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule per_sample_vcf:
+#     input:
+#         gene_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
+#     output:
+#         sample_gene_vcf=temp("results/grampa/gene_vcf/{sample}/{sample}.gene.temp.vcf")
+#     singularity:
+#         "containers/bcftools_1.21.sif"
+#     shell:
+#         """
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         # Subset gene VCF per individual
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         bcftools view -s {wildcards.sample} {input.gene_vcf} -o {output.sample_gene_vcf}
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule edit_sample_name_gene_vcf:
+#     input:
+#         sample_gene_vcf="results/grampa/gene_vcf/{sample}/{sample}.gene.temp.vcf"
+#     output:
+#         edited_sample_gene_vcf="results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz"
+#     shell:
+#         """
+#         # Rename the sample in the VCF to match the sample name in BAM file
+#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
+#         for vcf in {input.sample_gene_vcf}
+#         do
+#         prefix=$(echo $vcf | cut -f5 -d "/" | cut -f1 -d "." | cut -f1,2 -d "_")
+#         sed "s/{wildcards.sample}/$prefix/g" $vcf > results/grampa/gene_vcf/{wildcards.sample}/{wildcards.sample}.gene.vcf
+#         module load bioinfo-tools tabix/0.2.6
+#         bgzip results/grampa/gene_vcf/{wildcards.sample}/{wildcards.sample}.gene.vcf
+#         done
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# # Phase the VCF file for diploids and polyploids
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule phase_diploid_gene_vcf:
+#     input:
+#         edited_sample_gene_vcf="results/grampa/gene_vcf/{diploid}/{diploid}.gene.vcf.gz"
+#     output:
+#         phased_sample_gene_vcf="results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz"
+#     params:
+#         bam_file="results/mapped_dedup/{diploid}.dedup.bam",
+#         ref_file="data/genome/Lbolanderi.fasta"
+#     resources:
+#         threads=2,
+#         runtime="12h",
+#         mem_mb=12000,
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/whatshap.yaml"
+#     shell:
+#         """
+#         whatshap phase --output {output} {input} {params.bam_file} --reference {params.ref_file} --tag=PS 
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule phase_tetraploid_gene_vcf:
+#     input:
+#         edited_sample_gene_vcf="results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.vcf.gz"
+#     output:
+#         phased_sample_gene_vcf="results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz"
+#     params:
+#         bam_file="results/mapped_dedup/{tetraploid}.dedup.bam",
+#         ref_file="data/genome/Lbolanderi.fasta"
+#     resources:
+#         threads=2,
+#         runtime="12h",
+#         mem_mb=12000,
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/whatshap.yaml"
+#     shell:
+#         """
+#         whatshap polyphase --output {output} {input} {params.bam_file} --reference {params.ref_file} --ploidy 4 --tag=PS 
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule phase_hexaploid_gene_vcf:
+#     input:
+#         edited_sample_gene_vcf="results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.vcf.gz"
+#     output:
+#         phased_sample_gene_vcf="results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz"
+#     params:
+#         bam_file="results/mapped_dedup/{hexaploid}.dedup.bam",
+#         ref_file="data/genome/Lbolanderi.fasta"
+#     resources:
+#         threads=2,
+#         runtime="12h",
+#         mem_mb=12000,
+#         tmpdir="$SNIC_TMP"
+#     conda:
+#         "envs/whatshap.yaml"
+#     shell:
+#         """
+#         whatshap polyphase --output {output} {input} {params.bam_file} --reference {params.ref_file} --ploidy 6 --tag=PS 
+#         """
+# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+# rule extract_only_phased_SNPs_vcf:
+#     input:
+#         phased_sample_gene_vcf="results/grampa/gene_vcf/{sample}/{sample}.gene.phased.vcf.gz"
+#     output:
+#         phased_values="results/grampa/gene_vcf/{sample}/{sample}.ps_values.txt"
+#     singularity:
+#         "containers/bcftools_1.21.sif"
+#     shell:
+#         """
+#         bcftools index -t -f {input.phased_sample_gene_vcf}
+#         bcftools query -f "[%CHROM\\t%POS\\t%PS\\n]" {input.phased_sample_gene_vcf} | awk '$3!="."' | sort -k1,1 -k3,3n > {output.phased_values}
+#         """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Per each gene coordinates in the starting bed file, create a separate vcf
+# singularity exec ../containers/bcftools_1.21.sif bcftools view -r contig_000000F:40594-43131 -i 'GT~"|"' phased_cds_subset.vcf.gz -o gene.vcf
+
+# #!/bin/bash
+
+# # Input files
+# REGION_FILE="regions.txt"
+# VCF_FILE="sample.vcf"
+
+# # Iterate through the region file
+# while read -r contig start ps_value group; do
+#     # Subset the VCF for the contig and PS field
+#     bcftools view -r "$contig" -i "PS=$ps_value" "$VCF_FILE" -o "sample.${group}.vcf" -Oz
+
+#     # Index the output VCF
+#     bcftools index "sample.${group}.vcf"
+# done < "$REGION_FILE"
+
+# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 1 -f ../data/genome/Lbolanderi.fasta -o gene_haplotypes1.fasta gene.vcf.gz # limit it to one scaffold
+# singularity exec ../containers/bedtools_2.31.0.sif bedtools getfasta -fi gene_haplotypes1.fasta -bed gene.bed -fo hap1_genes.fasta
+
+
+
+# name: sample1_g1.1_h1
+# name: sample1_g1.1_h2
+# name: sample2_g1.1_h1
+# name: sample2_g1.1_h2
+
+# name: sample1_g1.2_h2
+# name: sample2_g1.2_h1
+# name: sample2_g1.2_h2
+
+# You can have multiple haplotype blocks per gene in that case you cannot stitch them together.
+# Because if you use all SNPs of a gene and make one long haplotype while they belong to separate
+# haplotypes, you are creating nonsensical haplotypes. You can add the gene name to the
+# haplotype number which is derived from the left-most position. We can have two haplotypes per gene.
+
+
+
+# Then just create haplotypes per gene since each VCFs contain only haplo blocks
+
+# I will have one directory per individual and in that directionary, I have each haplotype called gene1_H1.fasta but the fasta header should be P18758_169_H1 but I give each sample a new name, so for example, P18758_169_H1 is a_H1.
+# Then across all samples, I concatenate per gene, all haplotypes. 
+# I align and then make a tree.
+# Now I will have a gene tree per each gene. I will have so many gene trees, each depicting a specific types of topology.
+# I put together all these gene trees and feed it to Grampa together with a species tree from Treemix.
+# I let the program run! and check the tree with the least score for parsimony
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# And after that
+# bgzip phased_cds_subset.vcf
+# tabix phased_cds_subset.vcf.gz
+# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 1 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype1.fasta
+# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 2 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype2.fasta
+# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 3 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype3.fasta
+# singularity exec ../containers/bcftools_1.21.sif bcftools consensus -H 4 -f ../data/genome/Lbolanderi.fasta phased_cds_subset.vcf.gz > haplotype4.fasta
+
+#grep -w "CDS" ../../litho_genome/results/genome_annotation/braker.gtf | awk '{print $1"\t"$4-1"\t"$5"\t"$9}' | awk '{if ($1 ~ /_arrow$/) {gsub("_arrow", "", $1); $1 = "contig_" $1} print $0}' > cds_regions.bed
+#singularity exec ../containers/bcftools_1.21.sif bcftools view -R cds_cleaned_genes.bed -Oz -o snps_in_cds.vcf.gz ../results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly.vcf.gz
+
 
 # Remove SNPs with missing data 
 # bcftools view -e 'GT="." | GT="./."' ../results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_poly.vcf.gz -Oz -o filtered_no_missing_poly.vcf.gz
