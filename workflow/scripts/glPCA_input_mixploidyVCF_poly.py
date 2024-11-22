@@ -103,7 +103,7 @@ for sample in hexaploid_sample_names:
     # Corrected string concatenation
     print(">" + "_".join(sample.split("_")[0:2]))
     # Print the reduced genotype list (every 50th element)
-    print("".join(ind_genotypes_hexa[::50]))
+    print("".join(ind_genotypes_hexa))
 
 for sample in tetraploid_sample_names:
     ind_genotypes_tetraploid = []
@@ -129,7 +129,7 @@ for sample in tetraploid_sample_names:
     # Corrected string concatenation
     print(">" + "_".join(sample.split("_")[0:2]))
     # Print the reduced genotype list (every 50th element)
-    print("".join(ind_genotypes_tetraploid[::50]))
+    print("".join(ind_genotypes_tetraploid))
 
 for sample in diploid_sample_names:
     ind_genotypes_diploid = []
@@ -150,4 +150,4 @@ for sample in diploid_sample_names:
     # Corrected string concatenation
     print(">" + "_".join(sample.split("_")[0:2]))
     # Print the reduced genotype list (every 50th element)
-    print("".join(ind_genotypes_diploid[::50]))
+    print("".join(ind_genotypes_diploid))
