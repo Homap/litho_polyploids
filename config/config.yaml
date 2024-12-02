@@ -1,0 +1,5 @@
+sample_table: "config/sample_design_table_poly.tsv" #"config/sample_design_table.tsv"
+pair: ["R1", "R2"]
+genome: "ps_225_001.polished_assembly"
+species: "Lbolanderi"
+readgroup: "config/ReadGroup.txt"
