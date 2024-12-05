@@ -118,12 +118,12 @@ for sample in hexaploid_sample_names:
         else:
             print(genotype_hexaploid, "Error")
     # Corrected string concatenation
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele1[::2])) # First allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele2[::2])) # Second allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele3[::2])) # Third allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele4[::2])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele5[::2])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele6[::2])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele1[::15])) # First allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele2[::15])) # Second allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele3[::15])) # Third allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele4[::15])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele5[::15])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_hexaploid_allele6[::15])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
 # ----------------------------------------------------------------------------------------------------------------------------- #
 # Tetraploids
 # ----------------------------------------------------------------------------------------------------------------------------- #
@@ -183,12 +183,12 @@ for sample in tetraploid_sample_names:
             print(genotype_tetraploid, "Error")
     # Corrected string concatenation
     # Corrected string concatenation
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele1[::2])) # First allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele2[::2])) # Second allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele3[::2])) # Third allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele4[::2])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele5[::2])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele6[::2])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele1[::15])) # First allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele2[::15])) # Second allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele3[::15])) # Third allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele4[::15])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele5[::15])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_tetraploid_allele6[::15])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
 # ----------------------------------------------------------------------------------------------------------------------------- #
 # Diploids
 # ----------------------------------------------------------------------------------------------------------------------------- #
@@ -234,9 +234,9 @@ for sample in diploid_sample_names:
         else:
             print(genotype_diploid, "Error")
     # Corrected string concatenation
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele1[::2])) # First allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele2[::2])) # Second allele of all loci
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele3[::2])) # Third allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele4[::2])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele5[::2])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
-    print(sample+" "+" ".join(ind_genotypes_diploid_allele6[::2])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele1[::15])) # First allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele2[::15])) # Second allele of all loci
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele3[::15])) # Third allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele4[::15])) # Fourth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele5[::15])) # Fifth allele of all loci # Fake hexaploid by adding missing allele
+    print(sample+" "+" ".join(ind_genotypes_diploid_allele6[::15])) # Sixth allele of all loci # Fake hexaploid by adding missing allele
