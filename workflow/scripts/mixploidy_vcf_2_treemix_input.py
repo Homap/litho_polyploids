@@ -42,7 +42,7 @@ diploid_groups = [
 tetraploid_columns = [12, 13, 14, 15, 16, 17]  # Columns 13–18
 hexaploid_columns = [18, 19, 20, 21]  # Columns 19–22
 
-print(" ".join(["BAM", "MIN", "CHM", "GLA", "KNG4x", "MXN4x", "MIN4x", "MBL4x", "BAT4x", "WVR4x", "NHL6x", "SAM6x", "BAT6x", "HOP6x"]))
+print(" ".join(["BAM", "MIN", "MXN", "GLA", "KNG4x", "MXN4x", "MIN4x", "MBL4x", "BAT4x", "WVR4x", "NHL6x", "SAM6x", "BAT6x", "HOP6x"]))
 # Process each line of genotypes from BCFtools output
 for line in genotype_lines:
     genotypes = line.strip().split("\t")
