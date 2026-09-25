@@ -1017,32 +1017,6 @@ rule run_treemix:
         touch {output.jobdone}
         """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-
-# # rule plot_treemix:
-# # setwd("~/treemix/") # of course this needs to be adjusted
-# # prefix=c(2,3))
-# # prefix="genotypes_treemix"
-# # library(RColorBrewer)
-# # library(R.utils)
-# # source("plotting_functions.R") # here you need to add the path
-# # pdf("genotype_treemix_new.pdf", width = 10, height = 8)
-# # par(mfrow=c(2,3))
-# # for(edge in 0:5){
-# #   plot_tree(cex=0.8,paste0(prefix,".",edge))
-# #   title(paste(edge,"edges"))
-# # }
-# # dev.off()
-# # for(edge in 0:5){
-# #  plot_resid(stem=paste0(prefix,".",edge),pop_order="dogs.list")
-# # }
-# # module load R/4.3.2
-# # library(SiZer)
-# # library(OptM)
-# # folder <- system.file("extdata", package = "OptM")
-# # test.optM = optM(folder)
-# # pdf("optimum_M.pdf")
-# # plot_optM(test.optM, method = "Evanno")
-# # dev.off()
 # #--------------------------------------------------------------------------------------------------------------------------------------------------#
 # # GRAMPA
 # #--------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -1076,34 +1050,6 @@ rule run_treemix:
 #         python workflow/scripts/create_haplotypes.py
 #         touch {output}
 #         """
-#--------------------------------------------------------------------------------------------------------------------------------------------------#
-# python ../../../workflow/scripts/process_fasta_files.py in_fasta out_fasta
-
-# for contig_phase_set in results/grampa/input_processing/contig_haplotype/*
-# do
-# prefix=$(echo $contig_phase_set | cut -f5 -d "/")
-# echo $prefix
-# #cat $contig_phase_set/*.fasta > exploratory_temp/iqtree/fasta/${prefix}.fasta
-# python ../../../workflow/scripts/pad_sequences_to_max_length.py out_fasta/${prefix}.fasta padded_fasta/${prefix}.padded.fasta
-# done
-
-# for contig_phase_set in *.fasta
-# do
-# prefix=$(echo $contig_phase_set | cut -f1 -d ".")
-# echo $prefix
-# #cat $contig_phase_set/*.fasta > exploratory_temp/iqtree/fasta/${prefix}.fasta
-# python ../../../workflow/scripts/pad_sequences_to_max_length.py out_fasta/${prefix}_unique.fasta padded_fasta/${prefix}.padded.fasta
-# done
-
-# for contig_phase_set in padded_fasta/padded_GLA_fasta/*.padded.fasta
-# do
-# echo $contig_phase_set
-# iqtree2 -s $contig_phase_set -o "1_GLA"
-# python ../../../workflow/scripts/remove_branch_lengths.py ${contig_phase_set}.treefile ${contig_phase_set}.nbl.treefile 
-# done
-
-# cat padded_fasta/padded_GLA_fasta/*padded.fasta.nbl.treefile > gene_tree_grampa
-
 
 # rule iqtree_gene_tree:
 #     input:
@@ -1116,58 +1062,6 @@ rule run_treemix:
 #         "logs/iqtree_{gene}.log"
 #     shell:
 #         "iqtree -s {input.alignment} {params.iqtree_opts} > {log} 2>&1"
-
-
-# # use iqtree instead
-# for aa_aln in ../mafft_alignment/*_aa.aln
-# do
-# buscoID=$(echo $aa_aln | cut -f3 -d "/" | cut -f1 -d "_")
-# echo $buscoID
-# sbatch -J $buscoID iqtree.sh ${aa_aln} ${buscoID} > ../../slurm_job_IDs/iqtree_aa/${buscoID}.out
-# done
-
-# #!/usr/bin/bash -l
-
-# #SBATCH -A snic2022-22-149 
-# #SBATCH -p core
-# #SBATCH -n 16
-# #SBATCH -t 3-00:00:00 # Just in case it needs more time
-# #SBATCH --mail-user=maria.svensson_coelho@biol.lu.se
-# #SBATCH --mail-type=FAIL
-
-# module load bioinfo-tools iqtree/20220527-98d5331-omp-mpi
-# module load bioinfo-tools gcc/9.3.0 openmpi/3.1.5
-
-# aa_aln=$1
-
-# iqtree2 -s ${aa_aln}
-
-# # Species tree reconstruction
-# # Downloading and installing ASTRAL
-# git clone https://github.com/smirarab/ASTRAL.git
-# cd ASTRAL
-# ./make.sh
-# # Test if it works:
-# java -jar astral.5.7.8.jar -i Astral/test_data/song_primates.424.gene.tre
-# # It works! LALA :D
-# mkdir -p ../result/astral
-
-# cat ../result/raxml_aa/RAxML_bestTree.* >> ../result/astral/busco_genes_ML.tree
-# # Before we proceed with the species tree, we need to fix the title (or the taxa name) in the gene trees. As even single
-# # tax in these gene trees are identified as genspp|buscoid, they all have unique ids and it will be considered as separate
-# # taxa. We don't want this. For this, we need to remove the buscoid from the name.
-
-# sed -i 's/|[^:]*//g' busco_genes_ML.tree 
-
-# # Finally, let's generate a species tree using ASTRAL coalescent-based species tree estimation program. ASTRAL is a 
-# # fast method for estimating species trees from multiple genes which is statistically consistent, and can run on multiple gene trees efficiently.
-# export ASTRAL_HOME=ASTRAL
-# export ASTRAL_HOME=/proj/snic2022-23-81/algae_phylo_comp/software/ASTRAL
-
-# java -jar ${ASTRAL_HOME}/astral.5.7.8.jar --input ../result/astral/busco_genes_ML.tree --output ../result/astral/busco_genes_ASTRAL_spp.tree
-
-# A newick format tree is produced. I upload it into http://www.evolgenius.info/evolview to get a tree figure.
-
 
 # rule gene_vcf: # might need to delete this
 #     input:
