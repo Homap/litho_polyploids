@@ -127,18 +127,18 @@ rule all:
         "results/structure/K{k}/structure_K{k}_run{rep}.out_f",
         "results/treemix/treemix_out/m{m}/finished_{m}.{rep}.txt"
         ], sample=fastq_name, pair=config["pair"], genome=config["species"], num=range(1, 48), diploid=diploid_sample_names, tetraploid=tetraploid_sample_names, hexaploid=hexaploid_sample_names, k=range(2,11), rep=range(1,11), m=range(0,11))
-        # "results/structure/K{k}/structure_K{k}_run{rep}.out_f"
-        # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_diploids_poly.vcf.gz",
-        # "results/LD_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly",
-        # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz",
-        # "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp",
-        # "data/annotation/gene.bed",
-        # "results/grampa/gene_vcf/gene.vcf.gz",
-        # "results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz",
-        # "results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz",
-        # "results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz",
-        # "results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz",
-        # "results/grampa/gene_vcf/{sample}/{sample}.ps_values.txt"
+        "results/structure/K{k}/structure_K{k}_run{rep}.out_f"
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_diploids_poly.vcf.gz",
+        "results/LD_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_poly",
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz",
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_glPCA_structure_input.snp",
+        "data/annotation/gene.bed",
+        "results/grampa/gene_vcf/gene.vcf.gz",
+        "results/grampa/gene_vcf/{sample}/{sample}.gene.vcf.gz",
+        "results/grampa/gene_vcf/{diploid}/{diploid}.gene.phased.vcf.gz",
+        "results/grampa/gene_vcf/{tetraploid}/{tetraploid}.gene.phased.vcf.gz",
+        "results/grampa/gene_vcf/{hexaploid}/{hexaploid}.gene.phased.vcf.gz",
+        "results/grampa/gene_vcf/{sample}/{sample}.ps_values.txt"
 
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
@@ -222,399 +222,399 @@ rule filtering_fastp:
          --thread {resources.threads}
          """
 
-# rule fastqc_after_filtering:
-#     input:
-#        fastq="data/fastq_filtered/{sample}_{pair}_001.filtered.fastq.gz"
-#     output:
-#         fastqc_html="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.html",
-#         fastqc_zip="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip"
-#     params:
-#         outdir="results/fastqc_filtered",
-#         sample_adapter="data/adapters/adapters.txt"
-#     resources:
-#         threads = 1,
-#         runtime = "3h"
-#     singularity:
-#         "containers/fastqc_0.12.1.sif"
-#     shell:
-#         """
-#         fastqc {input} \
-#         --threads {resources.threads} \
-#         --outdir {params.outdir} \
-#         --kmers 7 \
-#         --adapters {params.sample_adapter}
-#         """
+rule fastqc_after_filtering:
+    input:
+       fastq="data/fastq_filtered/{sample}_{pair}_001.filtered.fastq.gz"
+    output:
+        fastqc_html="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.html",
+        fastqc_zip="results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip"
+    params:
+        outdir="results/fastqc_filtered",
+        sample_adapter="data/adapters/adapters.txt"
+    resources:
+        threads = 1,
+        runtime = "3h"
+    singularity:
+        "containers/fastqc_0.12.1.sif"
+    shell:
+        """
+        fastqc {input} \
+        --threads {resources.threads} \
+        --outdir {params.outdir} \
+        --kmers 7 \
+        --adapters {params.sample_adapter}
+        """
 
-# # rule multiqc_after_filtering:
-# #     input:
-# #         expand("results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip", sample=fastq_name, pair=config["pair"])
-# #     output:
-# #         "results/multiqc_filtered/multiqc_report.html"
-# #     singularity:
-# #         "containers/multiqc_v1.25.sif"
-# #     shell:
-# #         "multiqc results/fastqc_filtered/*filtered_fastqc.zip -o results/multiqc_filtered"
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # Create Genome Indices
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule bwa_index:
+# rule multiqc_after_filtering:
 #     input:
-#         "data/genome/{genome}.fasta",
+#         expand("results/fastqc_filtered/{sample}_{pair}_001.filtered_fastqc.zip", sample=fastq_name, pair=config["pair"])
 #     output:
-#         idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
-#     resources:
-#         threads= 3,
-#         runtime= "2h"
+#         "results/multiqc_filtered/multiqc_report.html"
 #     singularity:
-#         "containers/bwa_0.7.18.sif"
+#         "containers/multiqc_v1.25.sif"
 #     shell:
-#         """
-#         bwa index {input}
-#         """
-
-# rule createSeqdict:
-#     input:
-#         genome_fasta="data/genome/{genome}.fasta"
-#     output:
-#         genome_fasta_dict="data/genome/{genome}.dict"
-#     resources:
-#         threads=4,
-#         runtime="5h",
-#     singularity:
-#         "containers/picard_3.2.0.sif"
-#     shell:
-#         """
-#         java -jar /usr/picard/picard.jar CreateSequenceDictionary \
-#         --REFERENCE {input} \
-#         --OUTPUT {output}
-#         """
-
-# rule createSeqfai:
-#     input:
-#         genome_fasta="data/genome/{genome}.fasta"
-#     output:
-#         genome_index="data/genome/{genome}.fasta.fai"
-#     resources:
-#         threads= 4,
-#         runtime= "2h",
-#     singularity:
-#         "containers/samtools_1.20.c.sif"
-#     shell:
-#         """
-#         samtools faidx {input}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # Mapping
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule bwa_mem:
-#     input:
-#         fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
-#         fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
-#         genome_fasta="data/genome/Lbolanderi.fasta",
-#         amb="data/genome/Lbolanderi.fasta.amb",
-#         ann="data/genome/Lbolanderi.fasta.ann",
-#         bwt="data/genome/Lbolanderi.fasta.bwt",
-#         pac="data/genome/Lbolanderi.fasta.pac",
-#         sa="data/genome/Lbolanderi.fasta.sa"
-#     output:
-#         sam=temp("results/mapped/{sample}.sam")
-#     params:
-#         readgroup=lambda wildcards: get_readgroup(wildcards.sample)
-#     resources:
-#         threads= 18,
-#         runtime= "18h",
-#         mem_mb= 115200,
-#         tmpdir="$SNIC_TMP"
-#     benchmark:
-#         "benchmark/bwa_mem/{sample}.bwa_mem.txt"
-#     singularity:
-#         "containers/bwa_0.7.18.sif",
-#     shell:
-#         """
-#         bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} > {output.sam}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # SAM to BAM - Sorting - Getting BAM statistics
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule samtools_sam:
-#     input:
-#         sam="results/mapped/{sample}.sam"
-#     output:
-#         bam=temp("results/mapped/{sample}.sorted.bam"),
-#         bai="results/mapped/{sample}.sorted.bai",
-#         flagstats="results/mapped/{sample}.flagstats.txt",
-#         idxstat="results/mapped/{sample}.idxstat.txt"
-#     resources:
-#         threads= 10,
-#         runtime= "10h",
-#         tmpdir="$SNIC_TMP"
-#     benchmark:
-#         "benchmark/samtools_sam/{sample}.samtools_sam.txt"
-#     singularity:
-#         "containers/samtools_1.20.c.sif"
-#     shell:
-#         """
-#         samtools flagstat {input.sam} > {output.flagstats}
-#         samtools sort {input.sam} -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
-#         samtools idxstats {output.bam} > {output.idxstat}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # Mark duplicates in BAM file
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule markduplicates_bam:
-#     input:
-#         bam="results/mapped/{sample}.sorted.bam"
-#     output:
-#         dedupBam=protected("results/mapped_dedup/{sample}.dedup.bam"),
-#         metrics="results/mapped_dedup/{sample}.metrics.txt"
-#     resources:
-#         threads=15,
-#         runtime="12h",
-#         mem_mb=90000,
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx90g"
-#     benchmark:
-#         "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
-#     singularity:
-#         "containers/picard_3.2.0.sif"
-#     shell:
-#         """
-#         java {params.mem} -jar /usr/picard/picard.jar MarkDuplicates --INPUT {input} --OUTPUT {output.dedupBam} --METRICS_FILE {output.metrics} --TMP_DIR {resources.tmpdir} \
-#         --VALIDATION_STRINGENCY LENIENT \
-#         --ASSUME_SORT_ORDER coordinate \
-#         --CREATE_INDEX TRUE
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule create_intervals:
-#     input:
-#         genome="data/genome/Lbolanderi.fasta"
-#     output:
-#         intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 48)])
-#     params:
-#         num_scafs_per_interval = 300,
-#         intervals_dir="config/intervals"
-#     shell:
-#         """
-#         python workflow/scripts/split_fasta.py {input.genome} {params.num_scafs_per_interval} {params.intervals_dir}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule HaplotypeCaller_gvcf:
-#     input:
-#         genome_fasta="data/genome/Lbolanderi.fasta",
-#         genome_fasta_dict="data/genome/Lbolanderi.dict",
-#         genome_index="data/genome/Lbolanderi.fasta.fai",
-#         bam="results/mapped_dedup/{sample}.dedup.bam"
-#     output:
-#         gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
-#     resources:
-#         threads=2,
-#         mem_mb=12000,
-#         runtime="24h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx12g",
-#         interval="config/intervals/interval_{num}.bed",
-#         ploidy=lambda wildcards: get_ploidy(wildcards.sample)
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} HaplotypeCaller \
-#         -R {input.genome_fasta} \
-#         -I {input.bam} \
-#         -O {output.gvcf} \
-#         -L {params.interval} \
-#         -ploidy {params.ploidy} \
-#         --tmp-dir {resources.tmpdir} \
-#         -ERC GVCF
-#         """
+#         "multiqc results/fastqc_filtered/*filtered_fastqc.zip -o results/multiqc_filtered"
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule create_gdb_mapfile:
-#     input:
-#         design_table=config["sample_table"]
-#     output:
-#         expand("config/sample_map_poly/interval_{num}.sample_map", num=range(1, 48))
-#     run:
-#         design_table = pd.read_table(input.design_table, sep="\t")
-#         fastq_name = design_table.Fastq_Name
-#         for num in range(1, 48):
-#             sample_map = f"config/sample_map_poly/interval_{num}.sample_map"
-#             with open(sample_map, "w") as sample_map_file:
-#                 for fqname in fastq_name:
-#                     sample_map_file.write(f"{fqname}\tresults/gvcf/{fqname}/{fqname}.{num}.gvcf\n")
+# Create Genome Indices
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# When trying to do GenotypeGVCF, interval 45 failed repeatedly because it wasn't able to resolve contig_000891F:1854. I tried to exclude this
-# using -XL command in GenotypeGVCF but that was not possible. I will now remove this from the VCF files generated by HaplotypeCaller for interval 45.
-# This variant is observed in the samples P18758_145_S45_L002, P18758_147_S47_L002, P18758_148_S48_L002, P18758_174_S84_L004, P18758_177_S87_L004
+rule bwa_index:
+    input:
+        "data/genome/{genome}.fasta",
+    output:
+        idx=multiext("data/genome/{genome}.fasta", ".amb", ".ann", ".bwt", ".pac", ".sa")
+    resources:
+        threads= 3,
+        runtime= "2h"
+    singularity:
+        "containers/bwa_0.7.18.sif"
+    shell:
+        """
+        bwa index {input}
+        """
+
+rule createSeqdict:
+    input:
+        genome_fasta="data/genome/{genome}.fasta"
+    output:
+        genome_fasta_dict="data/genome/{genome}.dict"
+    resources:
+        threads=4,
+        runtime="5h",
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java -jar /usr/picard/picard.jar CreateSequenceDictionary \
+        --REFERENCE {input} \
+        --OUTPUT {output}
+        """
+
+rule createSeqfai:
+    input:
+        genome_fasta="data/genome/{genome}.fasta"
+    output:
+        genome_index="data/genome/{genome}.fasta.fai"
+    resources:
+        threads= 4,
+        runtime= "2h",
+    singularity:
+        "containers/samtools_1.20.c.sif"
+    shell:
+        """
+        samtools faidx {input}
+        """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule remove_contig_000891F_1854_INT45:
-#     input:
-#         P18758_146="results/gvcf/P18758_146_S46_L002/P18758_146_S46_L002.45.gvcf",
-#         P18758_148="results/gvcf/P18758_148_S48_L002/P18758_148_S48_L002.45.gvcf",
-#         P18758_149="results/gvcf/P18758_149_S49_L002/P18758_149_S49_L002.45.gvcf",
-#         P18758_175="results/gvcf/P18758_175_S85_L004/P18758_175_S85_L004.45.gvcf",
-#         P18758_178="results/gvcf/P18758_178_S88_L004/P18758_178_S88_L004.45.gvcf"
-#     output:
-#         P18758_146_out="results/gvcf/P18758_146_S46_L002/P18758_146_S46_L002.45.unfiltered.gvcf",
-#         P18758_148_out="results/gvcf/P18758_148_S48_L002/P18758_148_S48_L002.45.unfiltered.gvcf",
-#         P18758_149_out="results/gvcf/P18758_149_S49_L002/P18758_149_S49_L002.45.unfiltered.gvcf",
-#         P18758_175_out="results/gvcf/P18758_175_S85_L004/P18758_175_S85_L004.45.unfiltered.gvcf",
-#         P18758_178_out="results/gvcf/P18758_178_S88_L004/P18758_178_S88_L004.45.unfiltered.gvcf"
-#     params:
-#         mem= "-Xmx6g"
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_146} > results/gvcf/P18758_146_S46_L002/temp.P18758_146
-#         # mv {input.P18758_146} {output.P18758_146_out}
-#         # mv results/gvcf/P18758_146_S46_L002/temp.P18758_146 {input.P18758_146}
-
-#         # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_148} > results/gvcf/P18758_148_S48_L002/temp.P18758_148
-#         # mv {input.P18758_148} {output.P18758_148_out}
-#         # mv results/gvcf/P18758_148_S48_L002/temp.P18758_148 {input.P18758_148}
-
-#         # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_149} > results/gvcf/P18758_149_S49_L002/temp.P18758_149
-#         # mv {input.P18758_149} {output.P18758_149_out}
-#         # mv results/gvcf/P18758_149_S49_L002/temp.P18758_149 {input.P18758_149}
-
-#         # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_175} > results/gvcf/P18758_175_S85_L004/temp.P18758_175
-#         # mv {input.P18758_175} {output.P18758_175_out}
-#         # mv results/gvcf/P18758_175_S85_L004/temp.P18758_175 {input.P18758_175}
-
-#         # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_178} > results/gvcf/P18758_178_S88_L004/temp.P18758_178
-#         # mv {input.P18758_178} {output.P18758_178_out}
-#         # mv results/gvcf/P18758_178_S88_L004/temp.P18758_178 {input.P18758_178}
-
-#         gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_146} 
-#         gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_148} 
-#         gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_149} 
-#         gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_175} 
-#         gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_178} 
-#         """
+# Mapping
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule genomicsdbimport:
-#     input:
-#         sample_map="config/sample_map_poly/interval_{num}.sample_map"
-#     output:
-#         db=directory("results/genomicsdb_poly/interval_{num}_gdb")
-#     resources:
-#         threads=1,
-#         mem_mb=6400,
-#         runtime="48h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx6g",
-#         interval="config/intervals/interval_{num}.bed",
-#         sample_map="config/sample_map_poly/interval_{num}.sample_map"
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} GenomicsDBImport \
-#         --genomicsdb-workspace-path {output.db} \
-#         --intervals {params.interval} \
-#         --batch-size 50 \
-#         --sample-name-map {params.sample_map} \
-#         --tmp-dir {resources.tmpdir} 
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule GenotypeGVCFs:
-#     input:
-#         db="results/genomicsdb_poly/interval_{num}_gdb",
-#         genome_fasta="data/genome/Lbolanderi.fasta"
-#     output:
-#         vcf="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_poly.vcf"
-#     resources:
-#         threads=4,
-#         mem_mb=24000,
-#         runtime="12h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx24g",
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} GenotypeGVCFs \
-#         -R {input.genome_fasta} \
-#         -V gendb://{input.db} \
-#         -O {output.vcf} \
-#         --tmp-dir {resources.tmpdir}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule SortVCFs:
-#     input:
-#         vcf="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_poly.vcf"
-#     output:
-#         vcf_sorted="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted_poly.vcf"
-#     resources:
-#         threads=4,
-#         mem_mb=24000,
-#         runtime="48h",
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         genome_fasta_dict="data/genome/Lbolanderi.dict",
-#         mem= "-Xmx24g",
-#     singularity:
-#         "containers/gatk_4.6.0.0.sif"
-#     shell:
-#         """
-#         gatk --java-options {params.mem} SortVcf -I {input.vcf} -O {output.vcf_sorted} -SD {params.genome_fasta_dict} --TMP_DIR {resources.tmpdir}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # Create a list for concatenate_VCF
-# rule create_sorted_vcf_list:
-#     output:
-#         sorted_vcf_list="config/vcf_list_poly/sorted_vcf.list"
-#     shell:
-#         """
-#         for i in {{1..47}}
-#         do 
-#         echo results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_${{i}}_sorted_poly.vcf >> {output.sorted_vcf_list}
-#         done
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule concatenate_VCF:
-#     input:
-#         vcf_list="config/vcf_list_poly/sorted_vcf.list",
-#         vcf_sorted=expand("results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted_poly.vcf", num=range(1, 48))
-#     output:
-#         concat_vcf="results/cat_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_poly.vcf.gz"
-#     resources:
-#         threads=2,
-#         runtime="12h",
-#         mem_mb=12000,
-#         tmpdir="$SNIC_TMP"
-#     params:
-#         mem= "-Xmx12g"
-#     singularity:
-#         "containers/picard_3.2.0.sif"
-#     shell:
-#         """
-#         java {params.mem} -jar /usr/picard/picard.jar MergeVcfs \
-#         --INPUT {input.vcf_list} \
-#         --OUTPUT {output.concat_vcf}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule keep_biallelic_SNPs:
-#     input:
-#         concat_vcf="results/cat_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_poly.vcf.gz"
-#     output:
-#         snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
-#     resources:
-#         threads=2,
-#         runtime="12h",
-#         mem_mb=12000,
-#         tmpdir="$SNIC_TMP"
-#     singularity:
-#         "containers/bcftools_1.21.sif"
-#     shell:
-#         """
-#         bcftools view -m2 -M2 -v snps {input.concat_vcf} --output-type z --output {output.snp_vcf}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule bwa_mem:
+    input:
+        fastq1="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
+        fastq2="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
+        genome_fasta="data/genome/Lbolanderi.fasta",
+        amb="data/genome/Lbolanderi.fasta.amb",
+        ann="data/genome/Lbolanderi.fasta.ann",
+        bwt="data/genome/Lbolanderi.fasta.bwt",
+        pac="data/genome/Lbolanderi.fasta.pac",
+        sa="data/genome/Lbolanderi.fasta.sa"
+    output:
+        sam=temp("results/mapped/{sample}.sam")
+    params:
+        readgroup=lambda wildcards: get_readgroup(wildcards.sample)
+    resources:
+        threads= 18,
+        runtime= "18h",
+        mem_mb= 115200,
+        tmpdir="$SNIC_TMP"
+    benchmark:
+        "benchmark/bwa_mem/{sample}.bwa_mem.txt"
+    singularity:
+        "containers/bwa_0.7.18.sif",
+    shell:
+        """
+        bwa mem -M -t {resources.threads} -R {params.readgroup} {input.genome_fasta} {input.fastq1} {input.fastq2} > {output.sam}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# SAM to BAM - Sorting - Getting BAM statistics
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule samtools_sam:
+    input:
+        sam="results/mapped/{sample}.sam"
+    output:
+        bam=temp("results/mapped/{sample}.sorted.bam"),
+        bai="results/mapped/{sample}.sorted.bai",
+        flagstats="results/mapped/{sample}.flagstats.txt",
+        idxstat="results/mapped/{sample}.idxstat.txt"
+    resources:
+        threads= 10,
+        runtime= "10h",
+        tmpdir="$SNIC_TMP"
+    benchmark:
+        "benchmark/samtools_sam/{sample}.samtools_sam.txt"
+    singularity:
+        "containers/samtools_1.20.c.sif"
+    shell:
+        """
+        samtools flagstat {input.sam} > {output.flagstats}
+        samtools sort {input.sam} -T {resources.tmpdir} -O BAM | tee {output.bam} | samtools index - {output.bai}
+        samtools idxstats {output.bam} > {output.idxstat}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Mark duplicates in BAM file
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule markduplicates_bam:
+    input:
+        bam="results/mapped/{sample}.sorted.bam"
+    output:
+        dedupBam=protected("results/mapped_dedup/{sample}.dedup.bam"),
+        metrics="results/mapped_dedup/{sample}.metrics.txt"
+    resources:
+        threads=15,
+        runtime="12h",
+        mem_mb=90000,
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx90g"
+    benchmark:
+        "benchmark/mapped_dedup/{sample}.picardMarkDuplicates.txt"
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java {params.mem} -jar /usr/picard/picard.jar MarkDuplicates --INPUT {input} --OUTPUT {output.dedupBam} --METRICS_FILE {output.metrics} --TMP_DIR {resources.tmpdir} \
+        --VALIDATION_STRINGENCY LENIENT \
+        --ASSUME_SORT_ORDER coordinate \
+        --CREATE_INDEX TRUE
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_intervals:
+    input:
+        genome="data/genome/Lbolanderi.fasta"
+    output:
+        intervals=expand("config/intervals/interval_{num}.bed", num=[i for i in range(1, 48)])
+    params:
+        num_scafs_per_interval = 300,
+        intervals_dir="config/intervals"
+    shell:
+        """
+        python workflow/scripts/split_fasta.py {input.genome} {params.num_scafs_per_interval} {params.intervals_dir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule HaplotypeCaller_gvcf:
+    input:
+        genome_fasta="data/genome/Lbolanderi.fasta",
+        genome_fasta_dict="data/genome/Lbolanderi.dict",
+        genome_index="data/genome/Lbolanderi.fasta.fai",
+        bam="results/mapped_dedup/{sample}.dedup.bam"
+    output:
+        gvcf="results/gvcf/{sample}/{sample}.{num}.gvcf"
+    resources:
+        threads=2,
+        mem_mb=12000,
+        runtime="24h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx12g",
+        interval="config/intervals/interval_{num}.bed",
+        ploidy=lambda wildcards: get_ploidy(wildcards.sample)
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} HaplotypeCaller \
+        -R {input.genome_fasta} \
+        -I {input.bam} \
+        -O {output.gvcf} \
+        -L {params.interval} \
+        -ploidy {params.ploidy} \
+        --tmp-dir {resources.tmpdir} \
+        -ERC GVCF
+        """
+--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_gdb_mapfile:
+    input:
+        design_table=config["sample_table"]
+    output:
+        expand("config/sample_map_poly/interval_{num}.sample_map", num=range(1, 48))
+    run:
+        design_table = pd.read_table(input.design_table, sep="\t")
+        fastq_name = design_table.Fastq_Name
+        for num in range(1, 48):
+            sample_map = f"config/sample_map_poly/interval_{num}.sample_map"
+            with open(sample_map, "w") as sample_map_file:
+                for fqname in fastq_name:
+                    sample_map_file.write(f"{fqname}\tresults/gvcf/{fqname}/{fqname}.{num}.gvcf\n")
+--------------------------------------------------------------------------------------------------------------------------------------------------#
+When trying to do GenotypeGVCF, interval 45 failed repeatedly because it wasn't able to resolve contig_000891F:1854. I tried to exclude this
+using -XL command in GenotypeGVCF but that was not possible. I will now remove this from the VCF files generated by HaplotypeCaller for interval 45.
+This variant is observed in the samples P18758_145_S45_L002, P18758_147_S47_L002, P18758_148_S48_L002, P18758_174_S84_L004, P18758_177_S87_L004
+--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule remove_contig_000891F_1854_INT45:
+    input:
+        P18758_146="results/gvcf/P18758_146_S46_L002/P18758_146_S46_L002.45.gvcf",
+        P18758_148="results/gvcf/P18758_148_S48_L002/P18758_148_S48_L002.45.gvcf",
+        P18758_149="results/gvcf/P18758_149_S49_L002/P18758_149_S49_L002.45.gvcf",
+        P18758_175="results/gvcf/P18758_175_S85_L004/P18758_175_S85_L004.45.gvcf",
+        P18758_178="results/gvcf/P18758_178_S88_L004/P18758_178_S88_L004.45.gvcf"
+    output:
+        P18758_146_out="results/gvcf/P18758_146_S46_L002/P18758_146_S46_L002.45.unfiltered.gvcf",
+        P18758_148_out="results/gvcf/P18758_148_S48_L002/P18758_148_S48_L002.45.unfiltered.gvcf",
+        P18758_149_out="results/gvcf/P18758_149_S49_L002/P18758_149_S49_L002.45.unfiltered.gvcf",
+        P18758_175_out="results/gvcf/P18758_175_S85_L004/P18758_175_S85_L004.45.unfiltered.gvcf",
+        P18758_178_out="results/gvcf/P18758_178_S88_L004/P18758_178_S88_L004.45.unfiltered.gvcf"
+    params:
+        mem= "-Xmx6g"
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_146} > results/gvcf/P18758_146_S46_L002/temp.P18758_146
+        # mv {input.P18758_146} {output.P18758_146_out}
+        # mv results/gvcf/P18758_146_S46_L002/temp.P18758_146 {input.P18758_146}
+
+        # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_148} > results/gvcf/P18758_148_S48_L002/temp.P18758_148
+        # mv {input.P18758_148} {output.P18758_148_out}
+        # mv results/gvcf/P18758_148_S48_L002/temp.P18758_148 {input.P18758_148}
+
+        # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_149} > results/gvcf/P18758_149_S49_L002/temp.P18758_149
+        # mv {input.P18758_149} {output.P18758_149_out}
+        # mv results/gvcf/P18758_149_S49_L002/temp.P18758_149 {input.P18758_149}
+
+        # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_175} > results/gvcf/P18758_175_S85_L004/temp.P18758_175
+        # mv {input.P18758_175} {output.P18758_175_out}
+        # mv results/gvcf/P18758_175_S85_L004/temp.P18758_175 {input.P18758_175}
+
+        # awk '!($1=="contig_000891F" && $2==1854)' {input.P18758_178} > results/gvcf/P18758_178_S88_L004/temp.P18758_178
+        # mv {input.P18758_178} {output.P18758_178_out}
+        # mv results/gvcf/P18758_178_S88_L004/temp.P18758_178 {input.P18758_178}
+
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_146} 
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_148} 
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_149} 
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_175} 
+        gatk --java-options {params.mem} IndexFeatureFile -I {input.P18758_178} 
+        """
+--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule genomicsdbimport:
+    input:
+        sample_map="config/sample_map_poly/interval_{num}.sample_map"
+    output:
+        db=directory("results/genomicsdb_poly/interval_{num}_gdb")
+    resources:
+        threads=1,
+        mem_mb=6400,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx6g",
+        interval="config/intervals/interval_{num}.bed",
+        sample_map="config/sample_map_poly/interval_{num}.sample_map"
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} GenomicsDBImport \
+        --genomicsdb-workspace-path {output.db} \
+        --intervals {params.interval} \
+        --batch-size 50 \
+        --sample-name-map {params.sample_map} \
+        --tmp-dir {resources.tmpdir} 
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule GenotypeGVCFs:
+    input:
+        db="results/genomicsdb_poly/interval_{num}_gdb",
+        genome_fasta="data/genome/Lbolanderi.fasta"
+    output:
+        vcf="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_poly.vcf"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="12h",
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx24g",
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} GenotypeGVCFs \
+        -R {input.genome_fasta} \
+        -V gendb://{input.db} \
+        -O {output.vcf} \
+        --tmp-dir {resources.tmpdir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule SortVCFs:
+    input:
+        vcf="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_poly.vcf"
+    output:
+        vcf_sorted="results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted_poly.vcf"
+    resources:
+        threads=4,
+        mem_mb=24000,
+        runtime="48h",
+        tmpdir="$SNIC_TMP"
+    params:
+        genome_fasta_dict="data/genome/Lbolanderi.dict",
+        mem= "-Xmx24g",
+    singularity:
+        "containers/gatk_4.6.0.0.sif"
+    shell:
+        """
+        gatk --java-options {params.mem} SortVcf -I {input.vcf} -O {output.vcf_sorted} -SD {params.genome_fasta_dict} --TMP_DIR {resources.tmpdir}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# Create a list for concatenate_VCF
+rule create_sorted_vcf_list:
+    output:
+        sorted_vcf_list="config/vcf_list_poly/sorted_vcf.list"
+    shell:
+        """
+        for i in {{1..47}}
+        do 
+        echo results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_${{i}}_sorted_poly.vcf >> {output.sorted_vcf_list}
+        done
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule concatenate_VCF:
+    input:
+        vcf_list="config/vcf_list_poly/sorted_vcf.list",
+        vcf_sorted=expand("results/vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_{num}_sorted_poly.vcf", num=range(1, 48))
+    output:
+        concat_vcf="results/cat_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_poly.vcf.gz"
+    resources:
+        threads=2,
+        runtime="12h",
+        mem_mb=12000,
+        tmpdir="$SNIC_TMP"
+    params:
+        mem= "-Xmx12g"
+    singularity:
+        "containers/picard_3.2.0.sif"
+    shell:
+        """
+        java {params.mem} -jar /usr/picard/picard.jar MergeVcfs \
+        --INPUT {input.vcf_list} \
+        --OUTPUT {output.concat_vcf}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule keep_biallelic_SNPs:
+    input:
+        concat_vcf="results/cat_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_poly.vcf.gz"
+    output:
+        snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
+    resources:
+        threads=2,
+        runtime="12h",
+        mem_mb=12000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools view -m2 -M2 -v snps {input.concat_vcf} --output-type z --output {output.snp_vcf}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule index_vcf:
     input:
         vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
@@ -632,56 +632,56 @@ rule index_vcf:
     shell:
         """
         gatk --java-options {params.mem} IndexFeatureFile -I {input.vcf} 
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule get_info_field:
-#     input:
-#         biallelic_snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
-#     output:
-#         info_field="results/filtered_vcf_poly/info_field.txt"
-#     resources:
-#         threads=1,
-#         runtime="12h",
-#         mem_mb=6000,
-#         tmpdir="$SNIC_TMP"
-#     singularity:
-#         "containers/bcftools_1.21.sif"
-#     shell:
-#         """
-#         bcftools query -f '%CHROM\\t%POS\\t%AF\\t%BaseQRankSum\\t%DP\\t%ExcessHet\\t%FS\\t%InbreedingCoeff\\t%MQ\\t%MQRankSum\\t%QD\\t%ReadPosRankSum\\t%SOR\\n' {input.biallelic_snp_vcf} > {output.info_field}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule get_depth:
-#     input:
-#         biallelic_snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
-#     output:
-#         depth_diploid="results/filtered_vcf_poly/depth_diploid.txt",
-#         depth_tetraploid="results/filtered_vcf_poly/depth_tetraploid.txt",
-#         depth_hexaploid="results/filtered_vcf_poly/depth_hexaploid.txt",
-#         total_mapped_reads="config/total_mapped_reads.txt"
-#     params:
-#         samples_2x=fastq_names_with_ploidy_2,
-#         samples_4x=fastq_names_with_ploidy_4,
-#         samples_6x=fastq_names_with_ploidy_6
-#     resources:
-#         threads=1,
-#         runtime="12h",
-#         mem_mb=6000,
-#         tmpdir="$SNIC_TMP"
-#     singularity:
-#         "containers/bcftools_1.21.sif"
-#     shell:
-#         """
-#         bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_2x} {input.biallelic_snp_vcf} > {output.depth_diploid}
-#         bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_4x} {input.biallelic_snp_vcf} > {output.depth_tetraploid}
-#         bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_6x} {input.biallelic_snp_vcf} > {output.depth_hexaploid}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_info_field:
+    input:
+        biallelic_snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
+    output:
+        info_field="results/filtered_vcf_poly/info_field.txt"
+    resources:
+        threads=1,
+        runtime="12h",
+        mem_mb=6000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools query -f '%CHROM\\t%POS\\t%AF\\t%BaseQRankSum\\t%DP\\t%ExcessHet\\t%FS\\t%InbreedingCoeff\\t%MQ\\t%MQRankSum\\t%QD\\t%ReadPosRankSum\\t%SOR\\n' {input.biallelic_snp_vcf} > {output.info_field}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_depth:
+    input:
+        biallelic_snp_vcf="results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_poly.vcf.gz"
+    output:
+        depth_diploid="results/filtered_vcf_poly/depth_diploid.txt",
+        depth_tetraploid="results/filtered_vcf_poly/depth_tetraploid.txt",
+        depth_hexaploid="results/filtered_vcf_poly/depth_hexaploid.txt",
+        total_mapped_reads="config/total_mapped_reads.txt"
+    params:
+        samples_2x=fastq_names_with_ploidy_2,
+        samples_4x=fastq_names_with_ploidy_4,
+        samples_6x=fastq_names_with_ploidy_6
+    resources:
+        threads=1,
+        runtime="12h",
+        mem_mb=6000,
+        tmpdir="$SNIC_TMP"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_2x} {input.biallelic_snp_vcf} > {output.depth_diploid}
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_4x} {input.biallelic_snp_vcf} > {output.depth_tetraploid}
+        bcftools query -f '%CHROM\\t%POS\\t%DP[\\t%DP]\\n' -s {params.samples_6x} {input.biallelic_snp_vcf} > {output.depth_hexaploid}
 
-#         sed -i 's/\\./0/g' {output.depth_diploid}
-#         sed -i 's/\\./0/g' {output.depth_tetraploid} 
-#         sed -i 's/\\./0/g' {output.depth_hexaploid}
+        sed -i 's/\\./0/g' {output.depth_diploid}
+        sed -i 's/\\./0/g' {output.depth_tetraploid} 
+        sed -i 's/\\./0/g' {output.depth_hexaploid}
 
-#         grep '+ 0 mapped' results/mapped/*flagstats.txt | cut -f1 -d " " | cut -f3 -d "/" | sed 's/.flagstats.txt:/ /g' | awk 'BEGIN{{print "sample","totalreads"}}{{print $0}}' > {output.total_mapped_reads}
-#         """
+        grep '+ 0 mapped' results/mapped/*flagstats.txt | cut -f1 -d " " | cut -f3 -d "/" | sed 's/.flagstats.txt:/ /g' | awk 'BEGIN{{print "sample","totalreads"}}{{print $0}}' > {output.total_mapped_reads}
+        """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
 rule get_dist_plots:
     input:
@@ -1017,70 +1017,70 @@ rule run_treemix:
         touch {output.jobdone}
         """
 #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# # GRAMPA
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule get_common_phase_sets:
-#     output:
-#         "results/grampa/input_processing/phase_sets_in_10_samples_same_contig.txt"
-#     shell:
-#         """
-#         python workflow/scripts/common_phase_sets.py {output}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule create_vcf_per_sample_phase_set:
-#     output:
-#         "results/grampa/input_processing/vcf/outputprocessing_done.txt"
-#     shell:
-#         """
-#         python workflow/scripts/subset_phased_vcf.py
-#         touch {output}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule create_haplotypes:
-#     output:
-#         "results/grampa/input_processing/contig_haplotype/outputprocessing_done.txt"
-#     resources:
-#         threads=2,
-#         runtime="24h",
-#         mem_mb=12000,
-#         tmpdir="$SNIC_TMP"
-#     shell:
-#         """
-#         python workflow/scripts/create_haplotypes.py
-#         touch {output}
-#         """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+# GRAMPA
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule get_common_phase_sets:
+    output:
+        "results/grampa/input_processing/phase_sets_in_10_samples_same_contig.txt"
+    shell:
+        """
+        python workflow/scripts/common_phase_sets.py {output}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_vcf_per_sample_phase_set:
+    output:
+        "results/grampa/input_processing/vcf/outputprocessing_done.txt"
+    shell:
+        """
+        python workflow/scripts/subset_phased_vcf.py
+        touch {output}
+        """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule create_haplotypes:
+    output:
+        "results/grampa/input_processing/contig_haplotype/outputprocessing_done.txt"
+    resources:
+        threads=2,
+        runtime="24h",
+        mem_mb=12000,
+        tmpdir="$SNIC_TMP"
+    shell:
+        """
+        python workflow/scripts/create_haplotypes.py
+        touch {output}
+        """
 
-# rule iqtree_gene_tree:
-#     input:
-#         alignment="alignments/{gene}.fasta"  # Adjust the path and file format as needed
-#     output:
-#         tree="trees/{gene}_tree.nwk"  # The output tree in Newick format
-#     params:
-#         iqtree_opts="-m GTR+G -bb 1000 -alrt 1000"  # IQ-TREE model, bootstrap and ultrafast bootstrap options
-#     log:
-#         "logs/iqtree_{gene}.log"
-#     shell:
-#         "iqtree -s {input.alignment} {params.iqtree_opts} > {log} 2>&1"
+rule iqtree_gene_tree:
+    input:
+        alignment="alignments/{gene}.fasta"  # Adjust the path and file format as needed
+    output:
+        tree="trees/{gene}_tree.nwk"  # The output tree in Newick format
+    params:
+        iqtree_opts="-m GTR+G -bb 1000 -alrt 1000"  # IQ-TREE model, bootstrap and ultrafast bootstrap options
+    log:
+        "logs/iqtree_{gene}.log"
+    shell:
+        "iqtree -s {input.alignment} {params.iqtree_opts} > {log} 2>&1"
 
-# rule gene_vcf: # might need to delete this
-#     input:
-#         "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
-#     output:
-#         gene_bed="data/annotation/gene.bed",
-#         gene_vcf="results/grampa/gene_vcf/gene.vcf.gz"
-#     params:
-#         annot="data/annotation/braker.gtf"
-#     singularity:
-#         "containers/bcftools_1.21.sif"
-#     shell:
-#         """
-#         bcftools index -t -f {input}
-#         # Create bed file with gene coordinates
-#         awk '$3 == "CDS" {{print $1"\\t"$4-1"\\t"$5"\\t"$10}}' {params.annot} | sed "s/;//g" | awk '{{if ($1 ~ /_arrow$/) {{gsub("_arrow", "", $1); $1 = "contig_" $1}} print $0}}' | awk '{{print $1, $2, $3, $4}}' OFS='\\t' > {output.gene_bed}
-#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
-#         # Subset VCF file with SNPs overlapping only genes
-#         #--------------------------------------------------------------------------------------------------------------------------------------------------#
-#         bcftools view -R {output.gene_bed} -Oz -o {output.gene_vcf} {input}
-#         """
+rule gene_vcf: # might need to delete this
+    input:
+        "results/filtered_vcf_poly/Lbolanderi_2x.4x.6x_Lglabrum_2x_sorted_snp_biallelic_gatkHardFilter_passed_nomissing_LDprunned_poly.vcf.gz"
+    output:
+        gene_bed="data/annotation/gene.bed",
+        gene_vcf="results/grampa/gene_vcf/gene.vcf.gz"
+    params:
+        annot="data/annotation/braker.gtf"
+    singularity:
+        "containers/bcftools_1.21.sif"
+    shell:
+        """
+        bcftools index -t -f {input}
+        # Create bed file with gene coordinates
+        awk '$3 == "CDS" {{print $1"\\t"$4-1"\\t"$5"\\t"$10}}' {params.annot} | sed "s/;//g" | awk '{{if ($1 ~ /_arrow$/) {{gsub("_arrow", "", $1); $1 = "contig_" $1}} print $0}}' | awk '{{print $1, $2, $3, $4}}' OFS='\\t' > {output.gene_bed}
+        #--------------------------------------------------------------------------------------------------------------------------------------------------#
+        # Subset VCF file with SNPs overlapping only genes
+        #--------------------------------------------------------------------------------------------------------------------------------------------------#
+        bcftools view -R {output.gene_bed} -Oz -o {output.gene_vcf} {input}
+        """
 
