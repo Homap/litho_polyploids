@@ -141,86 +141,86 @@ rule all:
         # "results/grampa/gene_vcf/{sample}/{sample}.ps_values.txt"
 
 
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule edit_assemblies:
-#     input:
-#         genome = os.path.join("data/genome", (genome_name+".fasta"))
-#     output:
-#         edited_genome = "data/genome/{genome}.fasta",
-#         genome_stats = "data/genome/{genome}.stats.txt"
-#     params:
-#         species = "Lbolanderi"
-#     shell:
-#         """
-#         python workflow/scripts/assembly_stats.py {params.species} {input.genome} {output.edited_genome} {output.genome_stats}
-#         """
-# #--------------------------------------------------------------------------------------------------------------------------------------------------#
-# rule fastqc:
-#     input:
-#        fastq="data/fastq/{sample}_{pair}_001.fastq.gz",
-#     output:
-#         fastqc_html="results/fastqc/{sample}_{pair}_001_fastqc.html",
-#         fastqc_zip="results/fastqc/{sample}_{pair}_001_fastqc.zip"
-#     params:
-#         outdir="results/fastqc"
-#     resources:
-#         threads = 1,
-#         runtime = "3h"
-#     singularity:
-#         "containers/fastqc_0.12.1.sif"
-#     shell:
-#         """
-#         fastqc {input} \
-#         --outdir {params.outdir} \
-#         --kmers 7 
-#         """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule edit_assemblies:
+     input:
+         genome = os.path.join("data/genome", (genome_name+".fasta"))
+     output:
+         edited_genome = "data/genome/{genome}.fasta",
+         genome_stats = "data/genome/{genome}.stats.txt"
+     params:
+         species = "Lbolanderi"
+     shell:
+         """
+         python workflow/scripts/assembly_stats.py {params.species} {input.genome} {output.edited_genome} {output.genome_stats}
+         """
+#--------------------------------------------------------------------------------------------------------------------------------------------------#
+rule fastqc:
+     input:
+        fastq="data/fastq/{sample}_{pair}_001.fastq.gz",
+     output:
+         fastqc_html="results/fastqc/{sample}_{pair}_001_fastqc.html",
+         fastqc_zip="results/fastqc/{sample}_{pair}_001_fastqc.zip"
+     params:
+         outdir="results/fastqc"
+     resources:
+         threads = 1,
+         runtime = "3h"
+     singularity:
+         "containers/fastqc_0.12.1.sif"
+     shell:
+         """
+         fastqc {input} \
+         --outdir {params.outdir} \
+         --kmers 7 
+         """
 
-# # rule multiqc:
-# #     input:
-# #         expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
-# #     output:
-# #         "results/multiqc/multiqc_report.html"
-# #     singularity:
-# #         "containers/multiqc_v1.25.sif"
-# #     shell:
-# #         "multiqc results/fastqc/*fastqc.zip -o results/multiqc"
+rule multiqc:
+     input:
+         expand("results/fastqc/{sample}_{pair}_001_fastqc.zip", sample=fastq_name, pair=config["pair"])
+     output:
+         "results/multiqc/multiqc_report.html"
+     singularity:
+         "containers/multiqc_v1.25.sif"
+     shell:
+         "multiqc results/fastqc/*fastqc.zip -o results/multiqc"
 
-# rule filtering_fastp:
-#     input:
-#         fastq1="data/fastq/{sample}_R1_001.fastq.gz",
-#         fastq2="data/fastq/{sample}_R2_001.fastq.gz"
-#     output:
-#         fastq1_filtered="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
-#         fastq2_filtered="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
-#         unpaired1="data/fastq_unpaired/{sample}_unpaired1.fastq.gz",
-#         unpaired2="data/fastq_unpaired/{sample}_unpaired2.fastq.gz",
-#         failed_out="data/fastq_failed/{sample}.failed.fastq.gz",
-#         html_report="results/fastp_report/{sample}.html"
-#     resources:
-#         threads=10,
-#         runtime="12h"
-#     singularity:
-#         "containers/fastp_0.23.4.sif"
-#     shell:
-#         """
-#         fastp \
-#         --in1 {input.fastq1} \
-#         --in2 {input.fastq2} \
-#         --out1 {output.fastq1_filtered} \
-#         --out2 {output.fastq2_filtered} \
-#         --unpaired1 {output.unpaired1} \
-#         --unpaired2 {output.unpaired2} \
-#         --failed_out {output.failed_out} \
-#         --html {output.html_report} \
-#         --trim_poly_g 12 \
-#         --qualified_quality_phred=20 \
-#         --unqualified_percent_limit=40 \
-#         --length_required=140 \
-#         --overrepresentation_analysis \
-#         --adapter_sequence="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA" \
-#         --adapter_sequence_r2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT" \
-#         --thread {resources.threads}
-#         """
+rule filtering_fastp:
+     input:
+         fastq1="data/fastq/{sample}_R1_001.fastq.gz",
+         fastq2="data/fastq/{sample}_R2_001.fastq.gz"
+     output:
+         fastq1_filtered="data/fastq_filtered/{sample}_R1_001.filtered.fastq.gz",
+         fastq2_filtered="data/fastq_filtered/{sample}_R2_001.filtered.fastq.gz",
+         unpaired1="data/fastq_unpaired/{sample}_unpaired1.fastq.gz",
+         unpaired2="data/fastq_unpaired/{sample}_unpaired2.fastq.gz",
+         failed_out="data/fastq_failed/{sample}.failed.fastq.gz",
+         html_report="results/fastp_report/{sample}.html"
+     resources:
+         threads=10,
+         runtime="12h"
+     singularity:
+         "containers/fastp_0.23.4.sif"
+     shell:
+         """
+         fastp \
+         --in1 {input.fastq1} \
+         --in2 {input.fastq2} \
+         --out1 {output.fastq1_filtered} \
+         --out2 {output.fastq2_filtered} \
+         --unpaired1 {output.unpaired1} \
+         --unpaired2 {output.unpaired2} \
+         --failed_out {output.failed_out} \
+         --html {output.html_report} \
+         --trim_poly_g 12 \
+         --qualified_quality_phred=20 \
+         --unqualified_percent_limit=40 \
+         --length_required=140 \
+         --overrepresentation_analysis \
+         --adapter_sequence="AGATCGGAAGAGCACACGTCTGAACTCCAGTCA" \
+         --adapter_sequence_r2="AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT" \
+         --thread {resources.threads}
+         """
 
 # rule fastqc_after_filtering:
 #     input:
